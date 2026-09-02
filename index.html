@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#13251b">
   <meta name="description" content="BioEvo: Brasil Nativo — evolução, sobrevivência e civilização em um ecossistema brasileiro.">
-  <title>BioEvo: Brasil Nativo</title>
+  <title>BioEvo: Brasil Nativo — Ecossistema Evolutivo</title>
+  <meta name="application-name" content="BioEvo: Brasil Nativo">
+  <meta name="color-scheme" content="dark">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -150,9 +152,2504 @@
         <div class="start-note">Sem servidor • sem bibliotecas externas • pronto para GitHub Pages</div>
       </div>
     </div>
+
+    <section id="expansion-dashboard" class="exp-dashboard hidden">
+      <div class="exp-head">
+        <div><strong id="exp-dashboard-title">CENTRAL BIOEVO</strong><span id="exp-dashboard-subtitle">Visão da linhagem</span></div>
+        <button id="exp-close-dashboard" class="ui-btn">Fechar</button>
+      </div>
+      <div id="exp-dashboard-tabs" class="exp-tabs">
+        <button data-exp-tab="overview">Visão geral</button>
+        <button data-exp-tab="ecology">Ecologia</button>
+        <button data-exp-tab="lineage">Linhagem</button>
+        <button data-exp-tab="culture">Cultura</button>
+        <button data-exp-tab="technology">Tecnologia</button>
+        <button data-exp-tab="codex">Códex</button>
+      </div>
+      <div id="exp-dashboard-body" class="exp-body"></div>
+    </section>
   </div>
-  <script src="data.js"></script>
-  <script src="sprites.js"></script>
-  <script src="game.js"></script>
+  <script>
+  (async()=>{
+    const files=["data.txt","sprites.txt","game.txt"];
+    for(const file of files){
+      const res=await fetch(file,{cache:"no-store"});
+      if(!res.ok) throw new Error("Falha ao carregar "+file);
+      const code=await res.text();
+      new Function(code)();
+    }
+  })().catch(err=>{console.error(err);const l=document.getElementById("loading");if(l){l.classList.remove("hidden");l.innerHTML="<div>Falha ao carregar o jogo.</div><small>Abra pelo GitHub Pages ou por um servidor local.</small>";}});
+  </script>
 </body>
+<!-- BIOEVO TEMPLATE ATLAS: estruturas não instanciadas, prontas para futuras expansões de conteúdo. -->
+<template id="tpl-bioma-000">
+  <article class="catalog-template catalog-bioma">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">001</span>
+      <strong data-field="title">Registro de bioma 001</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-fauna-001">
+  <article class="catalog-template catalog-fauna">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">002</span>
+      <strong data-field="title">Registro de fauna 002</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-flora-002">
+  <article class="catalog-template catalog-flora">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">003</span>
+      <strong data-field="title">Registro de flora 003</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-gene-003">
+  <article class="catalog-template catalog-gene">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">004</span>
+      <strong data-field="title">Registro de gene 004</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-mutacao-004">
+  <article class="catalog-template catalog-mutacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">005</span>
+      <strong data-field="title">Registro de mutacao 005</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-recurso-005">
+  <article class="catalog-template catalog-recurso">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">006</span>
+      <strong data-field="title">Registro de recurso 006</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-construcao-006">
+  <article class="catalog-template catalog-construcao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">007</span>
+      <strong data-field="title">Registro de construcao 007</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tecnologia-007">
+  <article class="catalog-template catalog-tecnologia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">008</span>
+      <strong data-field="title">Registro de tecnologia 008</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-clima-008">
+  <article class="catalog-template catalog-clima">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">009</span>
+      <strong data-field="title">Registro de clima 009</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cultura-009">
+  <article class="catalog-template catalog-cultura">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">010</span>
+      <strong data-field="title">Registro de cultura 010</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-diplomacia-010">
+  <article class="catalog-template catalog-diplomacia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">011</span>
+      <strong data-field="title">Registro de diplomacia 011</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-missao-011">
+  <article class="catalog-template catalog-missao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">012</span>
+      <strong data-field="title">Registro de missao 012</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-conquista-012">
+  <article class="catalog-template catalog-conquista">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">013</span>
+      <strong data-field="title">Registro de conquista 013</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-relatorio-013">
+  <article class="catalog-template catalog-relatorio">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">014</span>
+      <strong data-field="title">Registro de relatorio 014</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-geracao-014">
+  <article class="catalog-template catalog-geracao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">015</span>
+      <strong data-field="title">Registro de geracao 015</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tribo-015">
+  <article class="catalog-template catalog-tribo">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">016</span>
+      <strong data-field="title">Registro de tribo 016</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cidade-016">
+  <article class="catalog-template catalog-cidade">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">017</span>
+      <strong data-field="title">Registro de cidade 017</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-civilizacao-017">
+  <article class="catalog-template catalog-civilizacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">018</span>
+      <strong data-field="title">Registro de civilizacao 018</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-expedicao-018">
+  <article class="catalog-template catalog-expedicao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">019</span>
+      <strong data-field="title">Registro de expedicao 019</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-evento-019">
+  <article class="catalog-template catalog-evento">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">020</span>
+      <strong data-field="title">Registro de evento 020</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-bioma-020">
+  <article class="catalog-template catalog-bioma">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">021</span>
+      <strong data-field="title">Registro de bioma 021</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-fauna-021">
+  <article class="catalog-template catalog-fauna">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">022</span>
+      <strong data-field="title">Registro de fauna 022</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-flora-022">
+  <article class="catalog-template catalog-flora">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">023</span>
+      <strong data-field="title">Registro de flora 023</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-gene-023">
+  <article class="catalog-template catalog-gene">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">024</span>
+      <strong data-field="title">Registro de gene 024</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-mutacao-024">
+  <article class="catalog-template catalog-mutacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">025</span>
+      <strong data-field="title">Registro de mutacao 025</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-recurso-025">
+  <article class="catalog-template catalog-recurso">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">026</span>
+      <strong data-field="title">Registro de recurso 026</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-construcao-026">
+  <article class="catalog-template catalog-construcao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">027</span>
+      <strong data-field="title">Registro de construcao 027</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tecnologia-027">
+  <article class="catalog-template catalog-tecnologia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">028</span>
+      <strong data-field="title">Registro de tecnologia 028</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-clima-028">
+  <article class="catalog-template catalog-clima">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">029</span>
+      <strong data-field="title">Registro de clima 029</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cultura-029">
+  <article class="catalog-template catalog-cultura">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">030</span>
+      <strong data-field="title">Registro de cultura 030</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-diplomacia-030">
+  <article class="catalog-template catalog-diplomacia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">031</span>
+      <strong data-field="title">Registro de diplomacia 031</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-missao-031">
+  <article class="catalog-template catalog-missao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">032</span>
+      <strong data-field="title">Registro de missao 032</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-conquista-032">
+  <article class="catalog-template catalog-conquista">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">033</span>
+      <strong data-field="title">Registro de conquista 033</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-relatorio-033">
+  <article class="catalog-template catalog-relatorio">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">034</span>
+      <strong data-field="title">Registro de relatorio 034</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-geracao-034">
+  <article class="catalog-template catalog-geracao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">035</span>
+      <strong data-field="title">Registro de geracao 035</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tribo-035">
+  <article class="catalog-template catalog-tribo">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">036</span>
+      <strong data-field="title">Registro de tribo 036</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cidade-036">
+  <article class="catalog-template catalog-cidade">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">037</span>
+      <strong data-field="title">Registro de cidade 037</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-civilizacao-037">
+  <article class="catalog-template catalog-civilizacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">038</span>
+      <strong data-field="title">Registro de civilizacao 038</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-expedicao-038">
+  <article class="catalog-template catalog-expedicao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">039</span>
+      <strong data-field="title">Registro de expedicao 039</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-evento-039">
+  <article class="catalog-template catalog-evento">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">040</span>
+      <strong data-field="title">Registro de evento 040</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-bioma-040">
+  <article class="catalog-template catalog-bioma">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">041</span>
+      <strong data-field="title">Registro de bioma 041</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-fauna-041">
+  <article class="catalog-template catalog-fauna">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">042</span>
+      <strong data-field="title">Registro de fauna 042</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-flora-042">
+  <article class="catalog-template catalog-flora">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">043</span>
+      <strong data-field="title">Registro de flora 043</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-gene-043">
+  <article class="catalog-template catalog-gene">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">044</span>
+      <strong data-field="title">Registro de gene 044</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-mutacao-044">
+  <article class="catalog-template catalog-mutacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">045</span>
+      <strong data-field="title">Registro de mutacao 045</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-recurso-045">
+  <article class="catalog-template catalog-recurso">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">046</span>
+      <strong data-field="title">Registro de recurso 046</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-construcao-046">
+  <article class="catalog-template catalog-construcao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">047</span>
+      <strong data-field="title">Registro de construcao 047</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tecnologia-047">
+  <article class="catalog-template catalog-tecnologia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">048</span>
+      <strong data-field="title">Registro de tecnologia 048</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-clima-048">
+  <article class="catalog-template catalog-clima">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">049</span>
+      <strong data-field="title">Registro de clima 049</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cultura-049">
+  <article class="catalog-template catalog-cultura">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">050</span>
+      <strong data-field="title">Registro de cultura 050</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-diplomacia-050">
+  <article class="catalog-template catalog-diplomacia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">051</span>
+      <strong data-field="title">Registro de diplomacia 051</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-missao-051">
+  <article class="catalog-template catalog-missao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">052</span>
+      <strong data-field="title">Registro de missao 052</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-conquista-052">
+  <article class="catalog-template catalog-conquista">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">053</span>
+      <strong data-field="title">Registro de conquista 053</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-relatorio-053">
+  <article class="catalog-template catalog-relatorio">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">054</span>
+      <strong data-field="title">Registro de relatorio 054</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-geracao-054">
+  <article class="catalog-template catalog-geracao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">055</span>
+      <strong data-field="title">Registro de geracao 055</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tribo-055">
+  <article class="catalog-template catalog-tribo">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">056</span>
+      <strong data-field="title">Registro de tribo 056</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cidade-056">
+  <article class="catalog-template catalog-cidade">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">057</span>
+      <strong data-field="title">Registro de cidade 057</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-civilizacao-057">
+  <article class="catalog-template catalog-civilizacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">058</span>
+      <strong data-field="title">Registro de civilizacao 058</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-expedicao-058">
+  <article class="catalog-template catalog-expedicao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">059</span>
+      <strong data-field="title">Registro de expedicao 059</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-evento-059">
+  <article class="catalog-template catalog-evento">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">060</span>
+      <strong data-field="title">Registro de evento 060</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-bioma-060">
+  <article class="catalog-template catalog-bioma">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">061</span>
+      <strong data-field="title">Registro de bioma 061</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-fauna-061">
+  <article class="catalog-template catalog-fauna">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">062</span>
+      <strong data-field="title">Registro de fauna 062</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-flora-062">
+  <article class="catalog-template catalog-flora">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">063</span>
+      <strong data-field="title">Registro de flora 063</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-gene-063">
+  <article class="catalog-template catalog-gene">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">064</span>
+      <strong data-field="title">Registro de gene 064</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-mutacao-064">
+  <article class="catalog-template catalog-mutacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">065</span>
+      <strong data-field="title">Registro de mutacao 065</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-recurso-065">
+  <article class="catalog-template catalog-recurso">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">066</span>
+      <strong data-field="title">Registro de recurso 066</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-construcao-066">
+  <article class="catalog-template catalog-construcao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">067</span>
+      <strong data-field="title">Registro de construcao 067</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tecnologia-067">
+  <article class="catalog-template catalog-tecnologia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">068</span>
+      <strong data-field="title">Registro de tecnologia 068</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-clima-068">
+  <article class="catalog-template catalog-clima">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">069</span>
+      <strong data-field="title">Registro de clima 069</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cultura-069">
+  <article class="catalog-template catalog-cultura">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">070</span>
+      <strong data-field="title">Registro de cultura 070</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-diplomacia-070">
+  <article class="catalog-template catalog-diplomacia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">071</span>
+      <strong data-field="title">Registro de diplomacia 071</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-missao-071">
+  <article class="catalog-template catalog-missao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">072</span>
+      <strong data-field="title">Registro de missao 072</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-conquista-072">
+  <article class="catalog-template catalog-conquista">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">073</span>
+      <strong data-field="title">Registro de conquista 073</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-relatorio-073">
+  <article class="catalog-template catalog-relatorio">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">074</span>
+      <strong data-field="title">Registro de relatorio 074</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-geracao-074">
+  <article class="catalog-template catalog-geracao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">075</span>
+      <strong data-field="title">Registro de geracao 075</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tribo-075">
+  <article class="catalog-template catalog-tribo">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">076</span>
+      <strong data-field="title">Registro de tribo 076</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cidade-076">
+  <article class="catalog-template catalog-cidade">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">077</span>
+      <strong data-field="title">Registro de cidade 077</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-civilizacao-077">
+  <article class="catalog-template catalog-civilizacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">078</span>
+      <strong data-field="title">Registro de civilizacao 078</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-expedicao-078">
+  <article class="catalog-template catalog-expedicao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">079</span>
+      <strong data-field="title">Registro de expedicao 079</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-evento-079">
+  <article class="catalog-template catalog-evento">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">080</span>
+      <strong data-field="title">Registro de evento 080</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-bioma-080">
+  <article class="catalog-template catalog-bioma">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">081</span>
+      <strong data-field="title">Registro de bioma 081</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-fauna-081">
+  <article class="catalog-template catalog-fauna">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">082</span>
+      <strong data-field="title">Registro de fauna 082</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-flora-082">
+  <article class="catalog-template catalog-flora">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">083</span>
+      <strong data-field="title">Registro de flora 083</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-gene-083">
+  <article class="catalog-template catalog-gene">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">084</span>
+      <strong data-field="title">Registro de gene 084</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-mutacao-084">
+  <article class="catalog-template catalog-mutacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">085</span>
+      <strong data-field="title">Registro de mutacao 085</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-recurso-085">
+  <article class="catalog-template catalog-recurso">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">086</span>
+      <strong data-field="title">Registro de recurso 086</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-construcao-086">
+  <article class="catalog-template catalog-construcao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">087</span>
+      <strong data-field="title">Registro de construcao 087</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tecnologia-087">
+  <article class="catalog-template catalog-tecnologia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">088</span>
+      <strong data-field="title">Registro de tecnologia 088</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-clima-088">
+  <article class="catalog-template catalog-clima">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">089</span>
+      <strong data-field="title">Registro de clima 089</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cultura-089">
+  <article class="catalog-template catalog-cultura">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">090</span>
+      <strong data-field="title">Registro de cultura 090</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-diplomacia-090">
+  <article class="catalog-template catalog-diplomacia">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">091</span>
+      <strong data-field="title">Registro de diplomacia 091</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-missao-091">
+  <article class="catalog-template catalog-missao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">092</span>
+      <strong data-field="title">Registro de missao 092</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-conquista-092">
+  <article class="catalog-template catalog-conquista">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">093</span>
+      <strong data-field="title">Registro de conquista 093</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-relatorio-093">
+  <article class="catalog-template catalog-relatorio">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">094</span>
+      <strong data-field="title">Registro de relatorio 094</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-geracao-094">
+  <article class="catalog-template catalog-geracao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">095</span>
+      <strong data-field="title">Registro de geracao 095</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-tribo-095">
+  <article class="catalog-template catalog-tribo">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">096</span>
+      <strong data-field="title">Registro de tribo 096</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-cidade-096">
+  <article class="catalog-template catalog-cidade">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">097</span>
+      <strong data-field="title">Registro de cidade 097</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-civilizacao-097">
+  <article class="catalog-template catalog-civilizacao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">098</span>
+      <strong data-field="title">Registro de civilizacao 098</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-expedicao-098">
+  <article class="catalog-template catalog-expedicao">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">099</span>
+      <strong data-field="title">Registro de expedicao 099</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<template id="tpl-evento-099">
+  <article class="catalog-template catalog-evento">
+    <header class="catalog-template-header">
+      <span class="catalog-template-number">100</span>
+      <strong data-field="title">Registro de evento 100</strong>
+    </header>
+    <div class="catalog-template-body">
+      <p data-field="description">Este modelo é preenchido somente quando o jogador descobre conteúdo.</p>
+      <dl class="catalog-template-stats">
+        <div><dt>Nível</dt><dd data-field="level">1</dd></div>
+        <div><dt>Raridade</dt><dd data-field="rarity">comum</dd></div>
+        <div><dt>Registro</dt><dd data-field="record">pendente</dd></div>
+      </dl>
+    </div>
+    <footer class="catalog-template-footer">BioEvo • Brasil Nativo</footer>
+  </article>
+</template>
+<!-- ATLAS FIELD 000 -->
+<template id="field-000">
+  <div class="field-row">
+    <label>Campo 000</label>
+    <span data-bind="field_000">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 001 -->
+<template id="field-001">
+  <div class="field-row">
+    <label>Campo 001</label>
+    <span data-bind="field_001">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 002 -->
+<template id="field-002">
+  <div class="field-row">
+    <label>Campo 002</label>
+    <span data-bind="field_002">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 003 -->
+<template id="field-003">
+  <div class="field-row">
+    <label>Campo 003</label>
+    <span data-bind="field_003">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 004 -->
+<template id="field-004">
+  <div class="field-row">
+    <label>Campo 004</label>
+    <span data-bind="field_004">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 005 -->
+<template id="field-005">
+  <div class="field-row">
+    <label>Campo 005</label>
+    <span data-bind="field_005">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 006 -->
+<template id="field-006">
+  <div class="field-row">
+    <label>Campo 006</label>
+    <span data-bind="field_006">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 007 -->
+<template id="field-007">
+  <div class="field-row">
+    <label>Campo 007</label>
+    <span data-bind="field_007">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 008 -->
+<template id="field-008">
+  <div class="field-row">
+    <label>Campo 008</label>
+    <span data-bind="field_008">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 009 -->
+<template id="field-009">
+  <div class="field-row">
+    <label>Campo 009</label>
+    <span data-bind="field_009">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 010 -->
+<template id="field-010">
+  <div class="field-row">
+    <label>Campo 010</label>
+    <span data-bind="field_010">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 011 -->
+<template id="field-011">
+  <div class="field-row">
+    <label>Campo 011</label>
+    <span data-bind="field_011">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 012 -->
+<template id="field-012">
+  <div class="field-row">
+    <label>Campo 012</label>
+    <span data-bind="field_012">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 013 -->
+<template id="field-013">
+  <div class="field-row">
+    <label>Campo 013</label>
+    <span data-bind="field_013">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 014 -->
+<template id="field-014">
+  <div class="field-row">
+    <label>Campo 014</label>
+    <span data-bind="field_014">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 015 -->
+<template id="field-015">
+  <div class="field-row">
+    <label>Campo 015</label>
+    <span data-bind="field_015">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 016 -->
+<template id="field-016">
+  <div class="field-row">
+    <label>Campo 016</label>
+    <span data-bind="field_016">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 017 -->
+<template id="field-017">
+  <div class="field-row">
+    <label>Campo 017</label>
+    <span data-bind="field_017">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 018 -->
+<template id="field-018">
+  <div class="field-row">
+    <label>Campo 018</label>
+    <span data-bind="field_018">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 019 -->
+<template id="field-019">
+  <div class="field-row">
+    <label>Campo 019</label>
+    <span data-bind="field_019">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 020 -->
+<template id="field-020">
+  <div class="field-row">
+    <label>Campo 020</label>
+    <span data-bind="field_020">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 021 -->
+<template id="field-021">
+  <div class="field-row">
+    <label>Campo 021</label>
+    <span data-bind="field_021">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 022 -->
+<template id="field-022">
+  <div class="field-row">
+    <label>Campo 022</label>
+    <span data-bind="field_022">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 023 -->
+<template id="field-023">
+  <div class="field-row">
+    <label>Campo 023</label>
+    <span data-bind="field_023">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 024 -->
+<template id="field-024">
+  <div class="field-row">
+    <label>Campo 024</label>
+    <span data-bind="field_024">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 025 -->
+<template id="field-025">
+  <div class="field-row">
+    <label>Campo 025</label>
+    <span data-bind="field_025">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 026 -->
+<template id="field-026">
+  <div class="field-row">
+    <label>Campo 026</label>
+    <span data-bind="field_026">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 027 -->
+<template id="field-027">
+  <div class="field-row">
+    <label>Campo 027</label>
+    <span data-bind="field_027">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 028 -->
+<template id="field-028">
+  <div class="field-row">
+    <label>Campo 028</label>
+    <span data-bind="field_028">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 029 -->
+<template id="field-029">
+  <div class="field-row">
+    <label>Campo 029</label>
+    <span data-bind="field_029">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 030 -->
+<template id="field-030">
+  <div class="field-row">
+    <label>Campo 030</label>
+    <span data-bind="field_030">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 031 -->
+<template id="field-031">
+  <div class="field-row">
+    <label>Campo 031</label>
+    <span data-bind="field_031">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 032 -->
+<template id="field-032">
+  <div class="field-row">
+    <label>Campo 032</label>
+    <span data-bind="field_032">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 033 -->
+<template id="field-033">
+  <div class="field-row">
+    <label>Campo 033</label>
+    <span data-bind="field_033">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 034 -->
+<template id="field-034">
+  <div class="field-row">
+    <label>Campo 034</label>
+    <span data-bind="field_034">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 035 -->
+<template id="field-035">
+  <div class="field-row">
+    <label>Campo 035</label>
+    <span data-bind="field_035">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 036 -->
+<template id="field-036">
+  <div class="field-row">
+    <label>Campo 036</label>
+    <span data-bind="field_036">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 037 -->
+<template id="field-037">
+  <div class="field-row">
+    <label>Campo 037</label>
+    <span data-bind="field_037">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 038 -->
+<template id="field-038">
+  <div class="field-row">
+    <label>Campo 038</label>
+    <span data-bind="field_038">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 039 -->
+<template id="field-039">
+  <div class="field-row">
+    <label>Campo 039</label>
+    <span data-bind="field_039">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 040 -->
+<template id="field-040">
+  <div class="field-row">
+    <label>Campo 040</label>
+    <span data-bind="field_040">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 041 -->
+<template id="field-041">
+  <div class="field-row">
+    <label>Campo 041</label>
+    <span data-bind="field_041">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 042 -->
+<template id="field-042">
+  <div class="field-row">
+    <label>Campo 042</label>
+    <span data-bind="field_042">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 043 -->
+<template id="field-043">
+  <div class="field-row">
+    <label>Campo 043</label>
+    <span data-bind="field_043">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 044 -->
+<template id="field-044">
+  <div class="field-row">
+    <label>Campo 044</label>
+    <span data-bind="field_044">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 045 -->
+<template id="field-045">
+  <div class="field-row">
+    <label>Campo 045</label>
+    <span data-bind="field_045">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 046 -->
+<template id="field-046">
+  <div class="field-row">
+    <label>Campo 046</label>
+    <span data-bind="field_046">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 047 -->
+<template id="field-047">
+  <div class="field-row">
+    <label>Campo 047</label>
+    <span data-bind="field_047">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 048 -->
+<template id="field-048">
+  <div class="field-row">
+    <label>Campo 048</label>
+    <span data-bind="field_048">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 049 -->
+<template id="field-049">
+  <div class="field-row">
+    <label>Campo 049</label>
+    <span data-bind="field_049">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 050 -->
+<template id="field-050">
+  <div class="field-row">
+    <label>Campo 050</label>
+    <span data-bind="field_050">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 051 -->
+<template id="field-051">
+  <div class="field-row">
+    <label>Campo 051</label>
+    <span data-bind="field_051">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 052 -->
+<template id="field-052">
+  <div class="field-row">
+    <label>Campo 052</label>
+    <span data-bind="field_052">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 053 -->
+<template id="field-053">
+  <div class="field-row">
+    <label>Campo 053</label>
+    <span data-bind="field_053">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 054 -->
+<template id="field-054">
+  <div class="field-row">
+    <label>Campo 054</label>
+    <span data-bind="field_054">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 055 -->
+<template id="field-055">
+  <div class="field-row">
+    <label>Campo 055</label>
+    <span data-bind="field_055">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 056 -->
+<template id="field-056">
+  <div class="field-row">
+    <label>Campo 056</label>
+    <span data-bind="field_056">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 057 -->
+<template id="field-057">
+  <div class="field-row">
+    <label>Campo 057</label>
+    <span data-bind="field_057">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 058 -->
+<template id="field-058">
+  <div class="field-row">
+    <label>Campo 058</label>
+    <span data-bind="field_058">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 059 -->
+<template id="field-059">
+  <div class="field-row">
+    <label>Campo 059</label>
+    <span data-bind="field_059">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 060 -->
+<template id="field-060">
+  <div class="field-row">
+    <label>Campo 060</label>
+    <span data-bind="field_060">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 061 -->
+<template id="field-061">
+  <div class="field-row">
+    <label>Campo 061</label>
+    <span data-bind="field_061">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 062 -->
+<template id="field-062">
+  <div class="field-row">
+    <label>Campo 062</label>
+    <span data-bind="field_062">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 063 -->
+<template id="field-063">
+  <div class="field-row">
+    <label>Campo 063</label>
+    <span data-bind="field_063">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 064 -->
+<template id="field-064">
+  <div class="field-row">
+    <label>Campo 064</label>
+    <span data-bind="field_064">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 065 -->
+<template id="field-065">
+  <div class="field-row">
+    <label>Campo 065</label>
+    <span data-bind="field_065">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 066 -->
+<template id="field-066">
+  <div class="field-row">
+    <label>Campo 066</label>
+    <span data-bind="field_066">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 067 -->
+<template id="field-067">
+  <div class="field-row">
+    <label>Campo 067</label>
+    <span data-bind="field_067">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 068 -->
+<template id="field-068">
+  <div class="field-row">
+    <label>Campo 068</label>
+    <span data-bind="field_068">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 069 -->
+<template id="field-069">
+  <div class="field-row">
+    <label>Campo 069</label>
+    <span data-bind="field_069">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 070 -->
+<template id="field-070">
+  <div class="field-row">
+    <label>Campo 070</label>
+    <span data-bind="field_070">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 071 -->
+<template id="field-071">
+  <div class="field-row">
+    <label>Campo 071</label>
+    <span data-bind="field_071">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 072 -->
+<template id="field-072">
+  <div class="field-row">
+    <label>Campo 072</label>
+    <span data-bind="field_072">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 073 -->
+<template id="field-073">
+  <div class="field-row">
+    <label>Campo 073</label>
+    <span data-bind="field_073">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 074 -->
+<template id="field-074">
+  <div class="field-row">
+    <label>Campo 074</label>
+    <span data-bind="field_074">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 075 -->
+<template id="field-075">
+  <div class="field-row">
+    <label>Campo 075</label>
+    <span data-bind="field_075">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 076 -->
+<template id="field-076">
+  <div class="field-row">
+    <label>Campo 076</label>
+    <span data-bind="field_076">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 077 -->
+<template id="field-077">
+  <div class="field-row">
+    <label>Campo 077</label>
+    <span data-bind="field_077">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 078 -->
+<template id="field-078">
+  <div class="field-row">
+    <label>Campo 078</label>
+    <span data-bind="field_078">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 079 -->
+<template id="field-079">
+  <div class="field-row">
+    <label>Campo 079</label>
+    <span data-bind="field_079">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 080 -->
+<template id="field-080">
+  <div class="field-row">
+    <label>Campo 080</label>
+    <span data-bind="field_080">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 081 -->
+<template id="field-081">
+  <div class="field-row">
+    <label>Campo 081</label>
+    <span data-bind="field_081">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 082 -->
+<template id="field-082">
+  <div class="field-row">
+    <label>Campo 082</label>
+    <span data-bind="field_082">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 083 -->
+<template id="field-083">
+  <div class="field-row">
+    <label>Campo 083</label>
+    <span data-bind="field_083">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 084 -->
+<template id="field-084">
+  <div class="field-row">
+    <label>Campo 084</label>
+    <span data-bind="field_084">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 085 -->
+<template id="field-085">
+  <div class="field-row">
+    <label>Campo 085</label>
+    <span data-bind="field_085">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 086 -->
+<template id="field-086">
+  <div class="field-row">
+    <label>Campo 086</label>
+    <span data-bind="field_086">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 087 -->
+<template id="field-087">
+  <div class="field-row">
+    <label>Campo 087</label>
+    <span data-bind="field_087">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 088 -->
+<template id="field-088">
+  <div class="field-row">
+    <label>Campo 088</label>
+    <span data-bind="field_088">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 089 -->
+<template id="field-089">
+  <div class="field-row">
+    <label>Campo 089</label>
+    <span data-bind="field_089">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 090 -->
+<template id="field-090">
+  <div class="field-row">
+    <label>Campo 090</label>
+    <span data-bind="field_090">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 091 -->
+<template id="field-091">
+  <div class="field-row">
+    <label>Campo 091</label>
+    <span data-bind="field_091">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 092 -->
+<template id="field-092">
+  <div class="field-row">
+    <label>Campo 092</label>
+    <span data-bind="field_092">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 093 -->
+<template id="field-093">
+  <div class="field-row">
+    <label>Campo 093</label>
+    <span data-bind="field_093">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 094 -->
+<template id="field-094">
+  <div class="field-row">
+    <label>Campo 094</label>
+    <span data-bind="field_094">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 095 -->
+<template id="field-095">
+  <div class="field-row">
+    <label>Campo 095</label>
+    <span data-bind="field_095">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 096 -->
+<template id="field-096">
+  <div class="field-row">
+    <label>Campo 096</label>
+    <span data-bind="field_096">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 097 -->
+<template id="field-097">
+  <div class="field-row">
+    <label>Campo 097</label>
+    <span data-bind="field_097">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 098 -->
+<template id="field-098">
+  <div class="field-row">
+    <label>Campo 098</label>
+    <span data-bind="field_098">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 099 -->
+<template id="field-099">
+  <div class="field-row">
+    <label>Campo 099</label>
+    <span data-bind="field_099">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 100 -->
+<template id="field-100">
+  <div class="field-row">
+    <label>Campo 100</label>
+    <span data-bind="field_100">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 101 -->
+<template id="field-101">
+  <div class="field-row">
+    <label>Campo 101</label>
+    <span data-bind="field_101">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 102 -->
+<template id="field-102">
+  <div class="field-row">
+    <label>Campo 102</label>
+    <span data-bind="field_102">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 103 -->
+<template id="field-103">
+  <div class="field-row">
+    <label>Campo 103</label>
+    <span data-bind="field_103">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 104 -->
+<template id="field-104">
+  <div class="field-row">
+    <label>Campo 104</label>
+    <span data-bind="field_104">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 105 -->
+<template id="field-105">
+  <div class="field-row">
+    <label>Campo 105</label>
+    <span data-bind="field_105">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 106 -->
+<template id="field-106">
+  <div class="field-row">
+    <label>Campo 106</label>
+    <span data-bind="field_106">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 107 -->
+<template id="field-107">
+  <div class="field-row">
+    <label>Campo 107</label>
+    <span data-bind="field_107">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 108 -->
+<template id="field-108">
+  <div class="field-row">
+    <label>Campo 108</label>
+    <span data-bind="field_108">—</span>
+  </div>
+</template>
+<!-- ATLAS FIELD 109 -->
+<template id="field-109">
+  <div class="field-row">
+    <label>Campo 109</label>
+    <span data-bind="field_109">—</span>
+  </div>
+</template>
 </html>

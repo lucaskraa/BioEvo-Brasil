@@ -1,2097 +1,5866 @@
-/*
-  BIOEVO: BRASIL NATIVO
-  Single-file game core for GitHub Pages.
-  Systems live in namespaces/classes to keep one-file deployment simple.
-*/
-(() => {
-  'use strict';
-
-  const D = window.BioData;
-  const SP = window.BioSprites;
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d', { alpha:false });
-  const portrait = document.getElementById('portrait');
-  const pctx = portrait.getContext('2d');
-  const evoPortrait = document.getElementById('evo-portrait');
-  const epctx = evoPortrait.getContext('2d');
-
-  const UI = {};
-  UI.start = document.getElementById('start-modal');
-  UI.loading = document.getElementById('loading');
-  UI.toast = document.getElementById('toast');
-  UI.speciesName = document.getElementById('species-name');
-  UI.speciesType = document.getElementById('species-type');
-  UI.dna = document.getElementById('dna');
-  UI.biomass = document.getElementById('biomass');
-  UI.stone = document.getElementById('stone');
-  UI.hp = document.getElementById('txt-hp');
-  UI.energy = document.getElementById('txt-energy');
-  UI.water = document.getElementById('txt-water');
-  UI.barHP = document.getElementById('bar-hp');
-  UI.barEnergy = document.getElementById('bar-energy');
-  UI.barWater = document.getElementById('bar-water');
-  UI.speed = document.getElementById('stat-speed');
-  UI.defense = document.getElementById('stat-defense');
-  UI.jump = document.getElementById('stat-jump');
-  UI.vision = document.getElementById('stat-vision');
-  UI.objectiveTitle = document.getElementById('objective-title');
-  UI.objectiveDesc = document.getElementById('objective-desc');
-  UI.objectiveProgress = document.getElementById('objective-progress');
-  UI.log = document.getElementById('event-log');
-  UI.evoModal = document.getElementById('evolution-modal');
-  UI.evoOptions = document.getElementById('evo-options');
-  UI.dnaLarge = document.getElementById('dna-large');
-  UI.lineageModal = document.getElementById('lineage-modal');
-  UI.lineageTree = document.getElementById('lineage-tree');
-  UI.mapModal = document.getElementById('map-modal');
-  UI.mapCanvas = document.getElementById('map-canvas');
-  UI.mapLegend = document.getElementById('map-legend');
-  UI.buildModal = document.getElementById('build-modal');
-  UI.buildOptions = document.getElementById('build-options');
-  UI.inputSpecies = document.getElementById('input-species');
-  UI.startBiomes = document.getElementById('start-biomes');
-  UI.pause = document.getElementById('btn-pause');
-  UI.save = document.getElementById('btn-save');
-  UI.load = document.getElementById('btn-load');
-
-  const G = {
-    running:false,
-    paused:false,
-    time:0,
-    day:1,
-    hour:7,
-    simAccumulator:0,
-    uiAccumulator:0,
-    weatherAccumulator:0,
-    popAccumulator:0,
-    fpsAccumulator:0,
-    fpsFrames:0,
-    fps:60,
-    last:performance.now(),
-    keys:new Set(),
-    mouse:{x:0,y:0,worldX:0,worldY:0,down:false},
-    selectedBiome:'cerrado',
-    modalOpen:false,
-    shake:0,
-    seed:Math.floor(Math.random()*999999),
-    toastTimer:0,
-    messageTimer:0
-  };
-
-  const World = {
-    width:D.WORLD_W,
-    height:D.WORLD_H,
-    tiles:[],
-    heightMap:[],
-    moistureMap:[],
-    waterMap:[],
-    discovered:new Set(),
-    biomeDiscovery:new Set(),
-    builds:[],
-    plants:[],
-    animals:[],
-    player:null,
-    camera:{x:0,y:0,zoom:1},
-    spatial:new Map(),
-    dirty:true
-  };
-
-  const Species = {
-    name:'Carijó',
-    id:'species_1',
-    type:'animal',
-    generation:1,
-    genes:null,
-    color:'#6fa64d',
-    dna:120,
-    biomass:0,
-    stone:0,
-    water:0,
-    population:1,
-    intelligence:5,
-    social:5,
-    cultural:0,
-    age:0,
-    lifetimeBest:0,
-    territory:1,
-    adaptations:[],
-    lineage:[],
-    offspring:0,
-    mates:0,
-    births:0,
-    deaths:0,
-    currentBiome:'cerrado',
-    era:'individuo',
-    techUnlocked:['stone'],
-    techProgress:0,
-    buildingsBuilt:0,
-    objectiveIndex:0,
-    objectivesDone:0,
-    plantMode:false,
-    traitHistory:[]
-  };
-
-  const Population = {
-    local:0,
-    remote:0,
-    herbivores:0,
-    predators:0,
-    plants:0,
-    villages:0,
-    tribes:0,
-    total(){return this.local+this.remote;},
-    recalc(){
-      this.local=World.animals.length;
-      this.plants=World.plants.length;
-      this.remote=0;
+/* BIOEVO: BRASIL NATIVO — GAME CORE — systems-first single bundle. */
+(()=>{
+'use strict';
+const D=window.BioData,SP=window.BioSprites;
+const canvas=document.getElementById('game'); const ctx=canvas.getContext('2d',{alpha:false});
+const pcanvas=document.getElementById('portrait'); const pctx=pcanvas.getContext('2d');
+const evoCanvas=document.getElementById('evo-portrait'); const evoCtx=evoCanvas.getContext('2d');
+const mapCanvas=document.getElementById('map-canvas'); const mapCtx=mapCanvas.getContext('2d');
+const lineageCanvas=document.getElementById('lineage-canvas'); const lineageCtx=lineageCanvas.getContext('2d');
+const $=id=>document.getElementById(id);
+const UI={start:$('start-modal'),loading:$('loading'),toast:$('toast'),species:$('species-name'),type:$('species-type'),generation:$('generation-label'),dna:$('dna'),biomass:$('biomass'),stone:$('stone'),population:$('population'),hp:$('txt-hp'),energy:$('txt-energy'),water:$('txt-water'),barHp:$('bar-hp'),barEnergy:$('bar-energy'),barWater:$('bar-water'),speed:$('stat-speed'),defense:$('stat-defense'),jump:$('stat-jump'),vision:$('stat-vision'),objectiveTitle:$('objective-title'),objectiveDesc:$('objective-desc'),objectiveProgress:$('objective-progress'),log:$('event-log'),evo:$('evolution-modal'),evoOptions:$('evo-options'),dnaLarge:$('dna-large'),build:$('build-modal'),buildOptions:$('build-options'),lineage:$('lineage-modal'),lineageTree:$('lineage-tree'),map:$('map-modal'),mapLegend:$('map-legend'),dashboard:$('dashboard'),dashboardBody:$('dashboard-body'),dashboardSubtitle:$('dashboard-subtitle'),polish:$('polish-hud')};
+const Game={running:false,paused:false,last:performance.now(),time:0,day:1,hour:6,seed:Math.floor(Math.random()*1e9),selectedBiome:'cerrado',mouse:{x:0,y:0,down:false},keys:{},camera:{x:0,y:0,zoom:1},world:{},player:null,species:null,nearby:[],plants:[],animals:[],buildings:[],particles:[],floating:[],lineage:[],discoveries:new Set(),weather:'clear',weatherTimer:0,weatherTicks:0,objective:null,activeTab:'overview',autosaveTimer:0};
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function rand(){Game.seed=(Game.seed*1664525+1013904223)>>>0;return Game.seed/4294967296;}
+function randi(a,b){return Math.floor(rand()*(b-a+1))+a;}
+function pick(arr){return arr[Math.floor(rand()*arr.length)];}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function tile(x,y){return Game.world.grid[y*D.WORLD_W+x]||0;}
+function key(x,y){return y*D.WORLD_W+x;}
+function say(text){const node=document.createElement('div');node.textContent=text;UI.log.prepend(node);while(UI.log.children.length>22)UI.log.lastChild.remove();UI.toast.textContent=text;UI.toast.classList.remove('hidden');clearTimeout(say.timer);say.timer=setTimeout(()=>UI.toast.classList.add('hidden'),2200);}
+function setModal(el,on=true){el.classList.toggle('hidden',!on);}
+function normGenes(g){return Object.assign(D.cloneGenes(D.START_GENES),g||{});}
+// ===== WORLDSYSTEM =====
+const WorldSystem={};
+WorldSystem.description="Generates a deterministic tile world using layered noise-like smoothing, biome bands, rivers, resources, and landmarks.";
+// ===== BIOMESYSTEM =====
+const BiomeSystem={};
+BiomeSystem.description="Resolves climate, movement, resource richness, and habitat quality from tile and weather.";
+// ===== WEATHERSYSTEM =====
+const WeatherSystem={};
+WeatherSystem.description="Transitions rain, drought, heat, cold, frost, storm, flood, and fire with gameplay effects.";
+// ===== TIMESYSTEM =====
+const TimeSystem={};
+TimeSystem.description="Runs compressed days and seasons without tying simulation speed to device refresh rate.";
+// ===== ENTITYSYSTEM =====
+const EntitySystem={};
+EntitySystem.description="Maintains a capped active entity set and swaps distant populations into statistical simulation.";
+// ===== ANIMALAISYSTEM =====
+const AnimalAISystem={};
+AnimalAISystem.description="Uses needs, utility scores, local sensing, flee/chase/feed/mate/rest states, and personality.";
+// ===== PLANTSYSTEM =====
+const PlantSystem={};
+PlantSystem.description="Grows flora from water, sunlight, soil fertility, and climate; handles regrowth and dispersal.";
+// ===== GENETICSSYSTEM =====
+const GeneticsSystem={};
+GeneticsSystem.description="Creates heritable offspring using weighted parental traits plus low-frequency mutation.";
+// ===== REPRODUCTIONSYSTEM =====
+const ReproductionSystem={};
+ReproductionSystem.description="Matches compatible adults, consumes energy, spawns descendants, and records lineage.";
+// ===== EVOLUTIONSYSTEM =====
+const EvolutionSystem={};
+EvolutionSystem.description="Spends DNA on mutations, applies trade-offs, and keeps adaptations visible.";
+// ===== POPULATIONSYSTEM =====
+const PopulationSystem={};
+PopulationSystem.description="Simulates births, mortality, migration, and distant territory in compact population cells.";
+// ===== RESOURCESYSTEM =====
+const ResourceSystem={};
+ResourceSystem.description="Generates harvest nodes, depletion, regrowth, inventory capacity, and resource conversion.";
+// ===== COMBATSYSTEM =====
+const CombatSystem={};
+CombatSystem.description="Resolves attacks, defense, thorns, fleeing, damage falloff, and death rewards.";
+// ===== BUILDINGSYSTEM =====
+const BuildingSystem={};
+BuildingSystem.description="Places structures, checks materials, enforces footprint/collision, and updates territory score.";
+// ===== TRIBESYSTEM =====
+const TribeSystem={};
+TribeSystem.description="Transforms individual-scale growth into roles, cohesion, settlement capacity, and leadership.";
+// ===== CIVILIZATIONSYSTEM =====
+const CivilizationSystem={};
+CivilizationSystem.description="Advances village, town, city, civilizational milestones, culture, trade, and diplomacy.";
+// ===== TECHNOLOGYSYSTEM =====
+const TechnologySystem={};
+TechnologySystem.description="Unlocks the historical progression from stone to engineering and abstract later sciences.";
+// ===== DIPLOMACYSYSTEM =====
+const DiplomacySystem={};
+DiplomacySystem.description="Tracks relations with neighboring groups and resolves trade, alliance, dispute, and war events.";
+// ===== SAVESYSTEM =====
+const SaveSystem={};
+SaveSystem.description="Serializes only stable state to LocalStorage and rejects malformed or oversized saves safely.";
+// ===== UISYSTEM =====
+const UISystem={};
+UISystem.description="Updates HUD, modals, dashboard tabs, logs, objectives, and action hints.";
+// ===== RENDERSYSTEM =====
+const RenderSystem={};
+RenderSystem.description="Draws a pixel-art scene with depth layers, weather, particles, lighting, and responsive camera.";
+WorldSystem.init=function(){
+  Game.world={w:D.WORLD_W,h:D.WORLD_H,grid:new Uint8Array(D.WORLD_W*D.WORLD_H),moisture:new Float32Array(D.WORLD_W*D.WORLD_H),height:new Float32Array(D.WORLD_W*D.WORLD_H),fertility:new Float32Array(D.WORLD_W*D.WORLD_H)};
+  for(let y=0;y<D.WORLD_H;y++){
+    for(let x=0;x<D.WORLD_W;x++){
+      const nx=x/D.WORLD_W,ny=y/D.WORLD_H;
+      const coast=Math.abs(nx-.52)+Math.abs(ny-.48)*.65;
+      const ridge=Math.sin(nx*16+Game.seed*.00001)*.15+Math.cos(ny*21)*.10+Math.sin((nx+ny)*34)*.05;
+      const h=clamp(.50+(ny-.5)*.18+ridge+(rand()-.5)*.08,0,1);
+      const m=clamp(.55+Math.sin(nx*12)*.12+Math.cos(ny*17)*.12-(ny-.5)*.15+(rand()-.5)*.18,0,1);
+      const fert=clamp(.45+m*.4-(h-.5)*.2+(rand()-.5)*.1,0,1);
+      let id=Math.floor((ny*D.BIOME_ORDER.length)+((nx>.82)?1:0))%D.BIOME_ORDER.length;
+      if(m>.78)id=0;
+      if(m<.22 && h>.48)id=1;
+      if(ny>.80)id=5;
+      if(Math.abs(ny-.57)<.10 && m>.62)id=4;
+      if(h>.73 && m>.40)id=2;
+      if(nx>.56 && ny>.26 && ny<.78 && m>.56)id=3;
+      Game.world.grid[key(x,y)]=id;
+      Game.world.height[key(x,y)]=h;
+      Game.world.moisture[key(x,y)]=m;
+      Game.world.fertility[key(x,y)]=fert;
     }
-  };
-
-  const Genetics = {
-    cloneGenes(src){return JSON.parse(JSON.stringify(src));},
-    clampGeneSet(g){
-      const min={speed:5,defense:0,jump:0,climb:0,dig:0,swim:0,flight:0,vision:10,hearing:5,smell:5,perception:5,feed:5,hunt:0,collect:0,fertility:5,heat:5,cold:5,drought:0,energyMax:35,waterMax:35,hpMax:35,intelligence:1,social:1};
-      Object.keys(min).forEach(k=>{if(typeof g[k]!=='number')g[k]=min[k];g[k]=D.clamp(g[k],min[k],200);});
-      g.energyDrain=D.clamp(g.energyDrain??.35,.08,2.4);
-      g.size=D.clamp(g.size??1,.45,2.2);
-      return g;
-    },
-    createSeed(type){
-      const g=D.defaultGenes(type);
-      g.color=type==='flyer'?'#b56b42':type==='swimmer'?'#5c92aa':'#6fa64d';
-      return g;
-    },
-    mutateChild(a,b){
-      const out={};
-      const keys=new Set([...Object.keys(a),...Object.keys(b)]);
-      keys.forEach(k=>{
-        if(typeof a[k]==='number' && typeof b[k]==='number'){
-          let v=D.lerp(a[k],b[k],D.rand(.25,.75));
-          if(Math.random()<.075){
-            const mag=Math.max(1,Math.abs(v)*D.rand(.04,.15));
-            v += D.rand(-mag,mag);
-          }
-          out[k]=v;
-        }else{
-          out[k]=Math.random()<.5?a[k]:b[k];
-        }
-      });
-      out.color=Math.random()<.5?(a.color||'#6fa64d'):(b.color||'#6fa64d');
-      this.clampGeneSet(out);
-      return out;
-    },
-    averageMutation(g,trait,amount){g[trait]=(g[trait]||0)+amount;this.clampGeneSet(g);},
-    apply(id){
-      const m=D.MUTATIONS.find(x=>x.id===id);
-      if(!m)return false;
-      if(Species.dna<m.cost)return false;
-      if(Species.adaptations.includes(id))return false;
-      Species.dna-=m.cost;
-      m.apply(Species.genes);
-      Species.adaptations.push(id);
-      Species.traitHistory.push({name:m.name,cost:m.cost,generation:Species.generation});
-      this.clampGeneSet(Species.genes);
-      addLog(`Mutação adquirida: ${m.name}.`,'good');
-      toast(`🧬 ${m.name} adquirida`);
-      UIRefresh.all();
-      return true;
-    }
-  };
-
-  const TimeSystem = {
-    speed:1,
-    dayLength:240,
-    tick(dt){
-      G.time+=dt*this.speed;
-      const totalMinutes=(G.time/this.dayLength)*1440;
-      const oldDay=G.day;
-      G.day=1+Math.floor(totalMinutes/1440);
-      G.hour=(6+totalMinutes/60)%24;
-      if(G.day!==oldDay){
-        onNewDay();
-      }
-      G.shake=Math.max(0,G.shake-dt*8);
-    },
-    getLight(){
-      const h=G.hour;
-      if(h<5 || h>20)return .28;
-      if(h<7)return D.lerp(.28,1,(h-5)/2);
-      if(h<17)return 1;
-      return D.lerp(1,.28,(h-17)/3);
-    },
-    label(){
-      const h=Math.floor(G.hour);const m=Math.floor((G.hour-h)*60);
-      return `Dia ${G.day} • ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-    }
-  };
-
-  const WeatherSystem = {
-    current:'clear',
-    remaining:35,
-    intensity:0,
-    choose(){
-      const b=D.BIOMES[Species.currentBiome]||D.BIOMES.cerrado;
-      const options=b.weather||['clear'];
-      let roll=Math.random();
-      if(roll<.34)this.current='clear';
-      else this.current=D.pick(options);
-      this.remaining=(D.WEATHER[this.current]||D.WEATHER.clear).dur*D.rand(.7,1.25);
-      this.intensity=this.current==='clear'?0:D.rand(.4,1);
-      addLog(`Clima: ${(D.WEATHER[this.current]||D.WEATHER.clear).name}.`,'warn');
-    },
-    tick(dt){
-      this.remaining-=dt*this.intensity;
-      if(this.remaining<=0)this.choose();
-      const w=D.WEATHER[this.current]||D.WEATHER.clear;
-      this.intensity=this.current==='clear'?0:D.lerp(this.intensity,D.WEATHER[this.current] ? .75 : 0,.01);
-      return w;
-    },
-    waterModifier(){return (D.WEATHER[this.current]||D.WEATHER.clear).water*this.intensity;},
-    tempModifier(){return (D.WEATHER[this.current]||D.WEATHER.clear).temp*this.intensity;},
-    plantModifier(){return D.WEATHER[this.current] ? D.lerp(1,D.WEATHER[this.current].plant,this.intensity) : 1;},
-    dangerModifier(){return D.WEATHER[this.current] ? D.lerp(1,D.WEATHER[this.current].danger,this.intensity) : 1;}
-  };
-
-  const CameraSystem = {
-    update(){
-      if(!World.player)return;
-      const vw=canvas.width, vh=canvas.height;
-      World.camera.zoom=D.clamp(World.camera.zoom, .75, 2.1);
-      const targetX=World.player.x;
-      const targetY=World.player.y;
-      World.camera.x=D.lerp(World.camera.x,targetX,.11);
-      World.camera.y=D.lerp(World.camera.y,targetY,.11);
-      World.camera.x=D.clamp(World.camera.x,vw/(2*D.TILE*World.camera.zoom),World.width-vw/(2*D.TILE*World.camera.zoom));
-      World.camera.y=D.clamp(World.camera.y,vh/(2*D.TILE*World.camera.zoom),World.height-vh/(2*D.TILE*World.camera.zoom));
-    },
-    screenToWorld(sx,sy){
-      const scale=D.TILE*World.camera.zoom;
-      return {x:World.camera.x+(sx-canvas.width/2)/scale,y:World.camera.y+(sy-canvas.height/2)/scale};
-    },
-    worldToScreen(wx,wy){
-      const scale=D.TILE*World.camera.zoom;
-      return {x:canvas.width/2+(wx-World.camera.x)*scale,y:canvas.height/2+(wy-World.camera.y)*scale};
-    }
-  };
-
-  const InputSystem = {
-    bind(){
-      window.addEventListener('keydown',e=>{
-        const key=e.key.toLowerCase();
-        if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(key))e.preventDefault();
-        G.keys.add(key);
-        if(UI.start.classList.contains('hidden'))this.handleKey(key);
-      });
-      window.addEventListener('keyup',e=>G.keys.delete(e.key.toLowerCase()));
-      canvas.addEventListener('mousemove',e=>{
-        const r=canvas.getBoundingClientRect();
-        G.mouse.x=(e.clientX-r.left)*(canvas.width/r.width);
-        G.mouse.y=(e.clientY-r.top)*(canvas.height/r.height);
-        const w=CameraSystem.screenToWorld(G.mouse.x,G.mouse.y);
-        G.mouse.worldX=w.x;G.mouse.worldY=w.y;
-        const cross=document.getElementById('crosshair');
-        cross.style.left=`${e.clientX-r.left}px`;
-        cross.style.top=`${e.clientY-r.top}px`;
-        cross.style.display='block';
-      });
-      canvas.addEventListener('mouseleave',()=>document.getElementById('crosshair').style.display='none');
-      canvas.addEventListener('mousedown',e=>{if(e.button===0){G.mouse.down=true;this.clickWorld();}});
-      window.addEventListener('mouseup',()=>G.mouse.down=false);
-      document.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',()=>this.action(btn.dataset.action)));
-      document.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click',()=>closeModal(btn.dataset.close)));
-      UI.save.addEventListener('click',()=>SaveSystem.save(true));
-      UI.load.addEventListener('click',()=>SaveSystem.load(true));
-      UI.pause.addEventListener('click',()=>Game.togglePause());
-      document.getElementById('btn-start').addEventListener('click',()=>Game.start());
-    },
-    handleKey(k){
-      if(k==='v')openEvolution();
-      if(k==='j')openLineage();
-      if(k==='m')openMap();
-      if(k==='b')openBuild();
-      if(k==='e')interact();
-      if(k===' ')useAbility();
-      if(k==='1')this.action('eat');
-      if(k==='2')this.action('call');
-      if(k==='3')this.action('dig');
-      if(k==='4')this.action('build');
-      if(k==='5')this.action('attack');
-      if(k==='p')Game.togglePause();
-      if(k==='escape')closeAllModals();
-      if(k==='+'||k==='=')World.camera.zoom=D.clamp(World.camera.zoom+.1,.75,2.1);
-      if(k==='-'||k==='_')World.camera.zoom=D.clamp(World.camera.zoom-.1,.75,2.1);
-    },
-    movementVector(){
-      let x=0,y=0;
-      if(G.keys.has('w')||G.keys.has('arrowup'))y-=1;
-      if(G.keys.has('s')||G.keys.has('arrowdown'))y+=1;
-      if(G.keys.has('a')||G.keys.has('arrowleft'))x-=1;
-      if(G.keys.has('d')||G.keys.has('arrowright'))x+=1;
-      const len=Math.hypot(x,y);if(len>0){x/=len;y/=len;}
-      return {x,y};
-    },
-    action(a){
-      if(!G.running)return;
-      if(a==='eat')PlayerSystem.feed();
-      if(a==='call')PlayerSystem.callMate();
-      if(a==='dig')PlayerSystem.dig();
-      if(a==='build')openBuild();
-      if(a==='attack')CombatSystem.playerAttack();
-    },
-    clickWorld(){
-      if(G.modalOpen||!World.player)return;
-      const p=World.player;
-      const w=G.mouse;
-      const dx=w.worldX-p.x,dy=w.worldY-p.y;
-      if(Math.hypot(dx,dy)<2.2){interact();return;}
-      p.target={x:w.worldX,y:w.worldY};
-    }
-  };
-
-  const EntitySystem = {
-    nextId:1,
-    createId(prefix){return `${prefix}_${this.nextId++}`;},
-    nearest(arr,x,y,max=999){
-      let best=null,bd=max;
-      for(const a of arr){const d=Math.hypot(a.x-x,a.y-y);if(d<bd){bd=d;best=a;}}
-      return best;
-    },
-    removeDead(){
-      World.animals=World.animals.filter(a=>a.hp>0 && !a.dead);
-      World.plants=World.plants.filter(p=>p.hp>0 && !p.dead);
-    }
-  };
-
-  const WorldSystem = {
-    generate(){
-      World.tiles=new Array(World.width*World.height);
-      World.heightMap=new Array(World.width*World.height);
-      World.moistureMap=new Array(World.width*World.height);
-      World.waterMap=new Array(World.width*World.height);
-      for(let y=0;y<World.height;y++){
-        for(let x=0;x<World.width;x++){
-          const i=y*World.width+x;
-          const n1=D.noise(x*.055,y*.055,G.seed);
-          const n2=D.noise(x*.12+50,y*.12+50,G.seed+9);
-          const ridge=Math.abs(n2-.5)*2;
-          const h=D.lerp(n1,.5,ridge*.5);
-          const m=D.noise(x*.045+130,y*.045+22,G.seed+3);
-          const edge=Math.min(x,World.width-1-x,y,World.height-1-y);
-          let biome=D.mazeBiome(x,y);
-          if(h<.19 && m>.45)biome='pantanal';
-          if(edge<4)biome=biome==='pampa'?'pampa':biome;
-          const water=(h<.205 || (m>.82&&n2<.45))?1:0;
-          World.heightMap[i]=h;
-          World.moistureMap[i]=m;
-          World.waterMap[i]=water;
-          World.tiles[i]={biome,height:h,moisture:m,water};
-        }
-      }
-      this.carveRivers();
-      this.scatterPlants();
-      this.scatterAnimals();
-      this.seedResources();
-    },
-    carveRivers(){
-      for(let r=0;r<8;r++){
-        let x=D.randi(4,World.width-5);let y=r%2===0?2:World.height-3;
-        const targetX=D.rand(0,World.width);const targetY=D.rand(0,World.height);
-        for(let i=0;i<260;i++){
-          const tx=Math.round(x),ty=Math.round(y);
-          for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
-            const xx=tx+ox,yy=ty+oy;
-            if(xx>=0&&yy>=0&&xx<World.width&&yy<World.height){const idx=yy*World.width+xx;World.waterMap[idx]=1;World.tiles[idx].water=1;World.tiles[idx].biome=World.tiles[idx].biome==='caatinga'?'cerrado':World.tiles[idx].biome;}
-          }
-          const dx=(targetX-x),dy=(targetY-y);const l=Math.hypot(dx,dy)||1;
-          x+=dx/l*(.5+D.rand(0,.8))+D.rand(-.8,.8);y+=dy/l*(.5+D.rand(0,.8))+D.rand(-.8,.8);
-          if(x<2||x>=World.width-2||y<2||y>=World.height-2)break;
-        }
-      }
-    },
-    tileAt(x,y){
-      const tx=Math.floor(x),ty=Math.floor(y);if(tx<0||ty<0||tx>=World.width||ty>=World.height)return null;return World.tiles[ty*World.width+tx];
-    },
-    isWater(x,y){const t=this.tileAt(x,y);return !!t&&t.water>0;},
-    biomeAt(x,y){const t=this.tileAt(x,y);return t?t.biome:'cerrado';},
-    scatterPlants(){
-      World.plants=[];
-      for(let i=0;i<720;i++){
-        const x=D.rand(2,World.width-2),y=D.rand(2,World.height-2);const t=this.tileAt(x,y);if(!t||t.water&&Math.random()>.32)continue;
-        const bd=D.BIOMES[t.biome];const key=D.pick(bd.plants);const spec=D.PLANTS[key];
-        World.plants.push({id:EntitySystem.createId('pl'),x,y,type:key,name:spec.name,kind:spec.kind,hp:50,maxHp:50,growth:D.rand(.4,1),age:D.rand(0,40),energy:spec.biomass,seedTimer:D.rand(10,80),color:this.plantColor(t.biome),discovered:false});
-      }
-    },
-    plantColor(b){
-      const c={amazonas:'#4d9d55',caatinga:'#8aa04d',cerrado:'#6f934a',mata:'#41915b',pantanal:'#579b63',pampa:'#779e52'};return c[b]||'#5c934c';
-    },
-    scatterAnimals(){
-      World.animals=[];
-      for(let i=0;i<190;i++){
-        const x=D.rand(3,World.width-3),y=D.rand(3,World.height-3);const t=this.tileAt(x,y);if(!t)continue;
-        const bd=D.BIOMES[t.biome];const key=D.pick(bd.animals);const spec=D.ANIMALS[key];
-        World.animals.push(this.makeAnimal(key,x,y));
-      }
-      Population.recalc();
-    },
-    makeAnimal(type,x,y){
-      const s=D.ANIMALS[type]||D.ANIMALS.capivara;
-      const kind=['arara','tucano','carcara','gavião','tuiuiu'].includes(type)?'bird':['peixe','ariranha'].includes(type)?'fish':'land';
-      return {id:EntitySystem.createId('an'),type,x,y,name:s.name,kind,hp:s.hp,maxHp:s.hp,energy:70,water:70,age:D.rand(4,45),maturity:D.rand(15,35),speed:s.speed,damage:s.damage,size:s.size,diet:s.diet,color:s.color,state:'idle',target:null,dir:D.rand(0,Math.PI*2),think:D.rand(0,2),pack:D.randi(0,3),dead:false,foodCooldown:0,breedCooldown:D.rand(2,18)};
-    },
-    seedResources(){
-      for(let y=0;y<World.height;y+=4)for(let x=0;x<World.width;x+=4){
-        const t=this.tileAt(x,y);if(!t)continue;
-        if(D.noise(x*.15,y*.15,G.seed+99)>.78 && !t.water)t.resource='stone';
-        if(D.noise(x*.09,y*.09,G.seed+77)>.83 && !t.water)t.resource='wood';
-      }
-    },
-    discoverAroundPlayer(){
-      const p=World.player;if(!p)return;
-      const radius=3+Species.genes.vision/35;
-      for(let oy=-radius;oy<=radius;oy++)for(let ox=-radius;ox<=radius;ox++){
-        const x=Math.floor(p.x+ox),y=Math.floor(p.y+oy);if(x<0||y<0||x>=World.width||y>=World.height)continue;
-        const key=`${x},${y}`;
-        if(!World.discovered.has(key))World.discovered.add(key);
-        const b=this.biomeAt(x,y);if(!World.biomeDiscovery.has(b)){World.biomeDiscovery.add(b);Species.territory=Math.max(Species.territory,World.biomeDiscovery.size);Species.dna+=20;addLog(`Novo ambiente descoberto: ${D.BIOMES[b].name}. +20 DNA.`,'good');}
-      }
-    }
-  };
-
-  const PlayerSystem = {
-    create(){
-      const start=this.findSpawn(Species.currentBiome);
-      World.player={id:'player',x:start.x,y:start.y,hp:Species.genes.hpMax,energy:Species.genes.energyMax,water:Species.genes.waterMax,age:4,maturity:false,dir:1,target:null,attackTimer:0,breedTimer:0,resting:false,stun:0,invuln:0,foodCooldown:0};
-      World.camera.x=start.x;World.camera.y=start.y;Species.age=4;
-      this.adaptToSpecies();
-    },
-    findSpawn(biome){
-      for(let i=0;i<500;i++){const x=D.rand(12,World.width-12),y=D.rand(12,World.height-12);if(WorldSystem.biomeAt(x,y)===biome && !WorldSystem.isWater(x,y))return{x,y};}
-      return{x:World.width*.45,y:World.height*.48};
-    },
-    adaptToSpecies(){
-      if(!World.player)return;
-      World.player.hp=D.clamp(World.player.hp||Species.genes.hpMax,1,Species.genes.hpMax);
-      World.player.energy=D.clamp(World.player.energy||Species.genes.energyMax,0,Species.genes.energyMax);
-      World.player.water=D.clamp(World.player.water||Species.genes.waterMax,0,Species.genes.waterMax);
-    },
-    update(dt){
-      const p=World.player;if(!p)return;
-      if(p.stun>0){p.stun-=dt;return;}
-      p.invuln=Math.max(0,p.invuln-dt);p.attackTimer=Math.max(0,p.attackTimer-dt);p.foodCooldown=Math.max(0,p.foodCooldown-dt);p.breedTimer=Math.max(0,p.breedTimer-dt);
-      const m=InputSystem.movementVector();
-      let tx=0,ty=0;
-      if(p.target && !G.keys.size){const dx=p.target.x-p.x,dy=p.target.y-p.y;const d=Math.hypot(dx,dy);if(d<.15)p.target=null;else{tx=dx/d;ty=dy/d;}}
-      if(m.x||m.y){tx=m.x;ty=m.y;p.target=null;}
-      const biome=D.BIOMES[WorldSystem.biomeAt(p.x,p.y)]||D.BIOMES.cerrado;
-      const terrain=biome.movement||1;
-      const temp=this.currentTemp();
-      const stress=this.temperatureStress(temp);
-      const speed=(Species.genes.speed/25)*terrain*(stress<.5?.72:1);
-      if(tx||ty){p.x+=tx*speed*dt;p.y+=ty*speed*dt;p.dir=tx>=0?1:-1;p.resting=false;p.energy=Math.max(0,p.energy-(.55+Species.genes.energyDrain)*dt);}
-      else {p.energy=Math.min(Species.genes.energyMax,p.energy+.35*dt);p.resting=true;}
-      p.water=Math.max(0,p.water-(.045+Math.max(0,WeatherSystem.waterModifier())*.001)*dt);
-      this.collideWorld();
-      Species.age+=dt/30;
-      if(Species.age>Species.genes.maturity&&!p.maturity){p.maturity=true;Species.dna+=25;addLog('Sua criatura atingiu a maturidade.','good');}
-      if(p.foodCooldown<=0 && (p.energy<25||p.water<18)){this.autoForage();}
-      if(p.hp<=0){this.handleDeath();}
-      if(p.energy<1||p.water<1){p.hp-=.6*dt;}
-    },
-    collideWorld(){
-      const p=World.player;p.x=D.clamp(p.x,1.2,World.width-1.2);p.y=D.clamp(p.y,1.2,World.height-1.2);
-      const t=WorldSystem.tileAt(p.x,p.y);if(t&&t.water&&!this.canSwim()){p.x-=.3*p.dir;p.y-=.12;World.player.water=Math.max(0,World.player.water-.8);}
-    },
-    canSwim(){return Species.genes.swim>38;},
-    currentTemp(){const b=D.BIOMES[Species.currentBiome]||D.BIOMES.cerrado;return b.temp+WeatherSystem.tempModifier()+Math.sin(G.time/60)*2;},
-    temperatureStress(temp){const g=Species.genes;let a=1;if(temp>25)a-=Math.max(0,(temp-25)-(g.heat-50)*.12)/30;if(temp<22)a-=Math.max(0,(22-temp)-(g.cold-50)*.12)/30;return D.clamp(a,0,1);},
-    autoForage(){
-      const p=World.player;const target=EntitySystem.nearest(World.plants,p.x,p.y,3.5);if(target){p.target={x:target.x,y:target.y};if(D.distance(p,target)<1.1)this.eatPlant(target);}else{const meat=EntitySystem.nearest(World.animals.filter(a=>a.hp>0),p.x,p.y,4);if(meat && Species.genes.hunt>42 && D.distance(p,meat)<1.2)CombatSystem.playerAttack();}
-    },
-    eatPlant(plant){
-      if(World.player.foodCooldown>0)return;
-      const spec=D.PLANTS[plant.type]||D.PLANTS.graminea;const food=D.FOOD[spec.food]||D.FOOD.folha;
-      const gain=food.energy*(.55+Species.genes.feed/100*.45)*WeatherSystem.plantModifier();
-      World.player.energy=D.clamp(World.player.energy+gain,0,Species.genes.energyMax);
-      World.player.water=D.clamp(World.player.water+food.water,0,Species.genes.waterMax);
-      World.player.foodCooldown=.65;
-      plant.growth-=.28;plant.hp-=18;plant.seedTimer+=4;
-      Species.dna+=food.dna;Species.biomass+=food.biomass;addLog(`Você comeu ${spec.name}. +${Math.round(gain)} energia.`,'good');
-      if(plant.hp<=0)plant.dead=true;
-    },
-    feed(){
-      const p=World.player;if(!p)return;
-      const plant=EntitySystem.nearest(World.plants,p.x,p.y,2.2);if(plant){this.eatPlant(plant);return;}
-      const a=EntitySystem.nearest(World.animals,p.x,p.y,2.2);if(a&&a.hp<=0){const val=D.FOOD.carne.energy; p.energy=D.clamp(p.energy+val,0,Species.genes.energyMax);p.water=D.clamp(p.water+1,0,Species.genes.waterMax);Species.dna+=5;Species.biomass+=1;addLog(`Carcaça consumida. +${val} energia.`,'good');a.dead=true;}
-      else toast('Nenhum alimento próximo');
-    },
-    drink(){
-      const p=World.player;const t=WorldSystem.tileAt(p.x,p.y);if(t&&t.water){p.water=D.clamp(p.water+55,0,Species.genes.waterMax);Species.dna+=2;toast('Água absorvida');}else toast('Procure um rio, lago ou área alagada');
-    },
-    dig(){
-      const p=World.player;const t=WorldSystem.tileAt(p.x,p.y);if(!t)return;
-      if(t.resource==='stone' || Math.random()<.22+Species.genes.dig/300){const amount=D.randi(2,6);Species.stone+=amount;Species.dna+=3;addLog(`Escavação: +${amount} pedra.`,'good');G.shake=.6;}else if(Math.random()<.55){Species.biomass+=D.randi(1,4);Species.dna+=1;addLog('Você encontrou matéria orgânica no solo.','good');}else{toast('Nada útil encontrado');}
-      World.player.energy=Math.max(0,World.player.energy-4);World.player.foodCooldown=.3;
-    },
-    callMate(){
-      const p=World.player;if(!p)return;
-      const mate=EntitySystem.nearest(World.animals.filter(a=>a.type==='player_proxy'||a.type===Species.id),p.x,p.y,7);
-      if(!mate){spawnMateNear();toast('Você chamou, mas nenhum parceiro respondeu');return;}
-      p.target={x:mate.x,y:mate.y};toast('Chamado reprodutivo emitido');
-    },
-    reproduceWith(mate){
-      const p=World.player;if(!p||p.breedTimer>0||!p.maturity||Species.age<Species.genes.maturity)return false;
-      if(D.distance(p,mate)>1.2)return false;
-      const child=Genetics.mutateChild(Species.genes,mate.genes||Species.genes);
-      const id=Species.lineage.length+2;
-      Species.offspring++;Species.births++;Species.mates++;Species.population++;Species.dna+=40;
-      Species.lineage.push({generation:Species.generation+1,name:`${Species.name} ${id}`,id,traits:traitSnapshot(child),parent:true});
-      Species.objectiveIndex=Math.max(Species.objectiveIndex,2);
-      p.breedTimer=12;
-      addLog(`Novo descendente gerado! A linhagem avançou para geração ${Species.generation+1}.`,'good');
-      toast('🧬 Descendente saudável');
-      this.startNextGeneration(child);
-      return true;
-    },
-    startNextGeneration(child){
-      Species.generation++;Species.genes=child;Species.age=0;Species.objectiveIndex=Math.min(Species.objectivesDone+1,D.OBJECTIVES.length-1);Species.currentBiome=WorldSystem.biomeAt(World.player.x,World.player.y);Species.dna+=45;
-      const oldName=Species.name;Species.name=makeSpeciesName(Species.name,Species.generation);
-      World.player.hp=Species.genes.hpMax;World.player.energy=Species.genes.energyMax;World.player.water=Species.genes.waterMax;World.player.maturity=false;World.player.target=null;
-      addLog(`Geração ${Species.generation}: ${oldName} → ${Species.name}. Características herdadas.` ,'good');
-      Species.intelligence=Species.genes.intelligence;Species.social=Species.genes.social;
-    },
-    handleDeath(){
-      if(World.player.invuln>0)return;
-      World.player.invuln=1.5;
-      Species.deaths++;
-      if(Species.population>1){Species.population--;Species.age=Math.max(0,Species.age-6);World.player.hp=Species.genes.hpMax*.65;World.player.energy=Species.genes.energyMax*.6;World.player.water=Species.genes.waterMax*.6;addLog('O indivíduo morreu, mas sua linhagem sobrevive graças à população.','warn');}
-      else {World.player.hp=Species.genes.hpMax*.8;World.player.energy=Species.genes.energyMax*.7;World.player.water=Species.genes.waterMax*.7;Species.dna=Math.max(0,Species.dna-10);Species.age=0;addLog('A linhagem quase desapareceu. Um indivíduo sobreviveu por pouco.','bad');}
-    },
-    habitatAdaptation(){
-      const b=D.BIOMES[WorldSystem.biomeAt(World.player.x,World.player.y)];if(b&&Species.currentBiome!==b.id){Species.currentBiome=b.id;Species.dna+=25;addLog(`A linhagem se estabeleceu em ${b.name}. +25 DNA.`,'good');}
-    }
-  };
-
-  const AISystem = {
-    tick(dt){
-      const p=World.player;
-      for(let i=0;i<World.animals.length;i++){
-        const a=World.animals[i];if(a.dead)continue;
-        a.age+=dt/50;a.think-=dt;a.foodCooldown=Math.max(0,a.foodCooldown-dt);a.breedCooldown=Math.max(0,a.breedCooldown-dt);
-        if(a.think<=0){this.think(a);a.think=D.rand(.5,2.5);}
-        this.move(a,dt);
-        this.needs(a,dt);
-        this.interactions(a,dt);
-        if(a.hp<=0)a.dead=true;
-      }
-      if(p){}
-    },
-    think(a){
-      const dist=World.player?D.distance(a,World.player):999;
-      if(a.hp<a.maxHp*.25){a.state='fleeing';a.target=this.nearestPlant(a);return;}
-      if(a.energy<20 || a.water<20){a.state='seeking_food';a.target=this.nearestPlant(a);return;}
-      if(a.age>a.maturity && a.breedCooldown<=0 && Math.random()<.18){a.state='mating';a.target=this.nearestMate(a);return;}
-      if(dist<5 && a.diet==='carn' && Math.random()<.35){a.state='hunting';a.target=World.player;return;}
-      if(Math.random()<.12){a.state='resting';a.target=null;return;}
-      a.state=Math.random()<.55?'exploring':'foraging';a.target=a.state==='foraging'?this.nearestPlant(a):null;
-    },
-    nearestPlant(a){return EntitySystem.nearest(World.plants,a.x,a.y,10);},
-    nearestMate(a){return EntitySystem.nearest(World.animals.filter(x=>x!==a&&x.type===a.type&&x.hp>0),a.x,a.y,8);},
-    needs(a,dt){
-      a.energy=Math.max(0,a.energy-(.12+Math.random()*.08)*dt);
-      a.water=Math.max(0,a.water-.07*dt);
-      if(a.energy<1||a.water<1)a.hp-=.3*dt;
-    },
-    move(a,dt){
-      let tx=0,ty=0;
-      if(a.target){const dx=a.target.x-a.x,dy=a.target.y-a.y,d=Math.hypot(dx,dy);if(d<.8 && a.state!=='fleeing')this.arrive(a);else if(d>0){tx=dx/d;ty=dy/d;}}
-      if(!tx&&!ty){a.dir+=D.rand(-.4,.4);tx=Math.cos(a.dir);ty=Math.sin(a.dir);}
-      if(a.state==='resting')return;
-      const biome=D.BIOMES[WorldSystem.biomeAt(a.x,a.y)]||D.BIOMES.cerrado;
-      const speed=(a.speed/45)*(biome.movement||1)*(a.kind==='fish'?1.12:1)*dt;
-      const nx=a.x+tx*speed,ny=a.y+ty*speed;
-      if(WorldSystem.isWater(nx,ny)&&a.kind!=='fish'&&Species.genes.swim<42){a.dir+=Math.PI/2;return;}
-      a.x=D.clamp(nx,1.5,World.width-1.5);a.y=D.clamp(ny,1.5,World.height-1.5);
-      if(tx!==0)a.facing=tx>0?1:-1;
-    },
-    arrive(a){
-      if(a.state==='foraging'&&a.target?.id?.startsWith('pl')){if(a.foodCooldown<=0){const spec=D.PLANTS[a.target.type];if(spec){a.energy=Math.min(100,a.energy+(D.FOOD[spec.food]?.energy||12)*.5);a.water=Math.min(100,a.water+(D.FOOD[spec.food]?.water||2));a.target.growth-=.12;a.target.hp-=7;a.foodCooldown=2;}}}
-      if(a.state==='hunting'&&a.target===World.player){CombatSystem.animalAttack(a,World.player);a.target=null;a.think=1;}
-      if(a.state==='mating'&&a.target && D.distance(a,a.target)<1){if(a.breedCooldown<=0&&a.target.breedCooldown<=0){a.breedCooldown=16;a.target.breedCooldown=16;this.spawnOffspring(a,a.target);}}
-      a.target=null;
-    },
-    interactions(a,dt){
-      const p=World.player;if(!p)return;
-      const d=D.distance(a,p);
-      if(d<1.05 && a.state==='hunting' && a.damage>0){CombatSystem.animalAttack(a,p);}
-      if(d<1.25 && a.diet==='herb'){p.hp-=0.0;}
-    },
-    spawnOffspring(a,b){
-      if(World.animals.length>260)return;
-      const child=this.spawnCompatible(a.type,a.x+D.rand(-1,1),a.y+D.rand(-1,1));child.maxHp=(a.maxHp+b.maxHp)/2;child.hp=child.maxHp*.6;child.age=0;addLog(`${a.name} teve um filhote. O ecossistema ganha uma nova geração.`,'good');
-    },
-    spawnCompatible(type,x,y){
-      const a=WorldSystem.makeAnimal(type,x,y);World.animals.push(a);Population.recalc();return a;
-    }
-  };
-
-  const CombatSystem = {
-    playerAttack(){
-      const p=World.player;if(!p||p.attackTimer>0)return;
-      p.attackTimer=.45;p.energy=Math.max(0,p.energy-3);
-      const enemies=World.animals.filter(a=>a.hp>0&&D.distance(a,p)<1.55).sort((a,b)=>D.distance(a,p)-D.distance(b,p));
-      const e=enemies[0];if(!e){toast('Nenhum alvo no alcance');return;}
-      const base=9+Species.genes.speed*.05+Species.genes.thorns*.1;const dmg=Math.max(2,base-e.size*2);
-      e.hp-=dmg;e.state='fleeing';e.target=p;e.think=1;
-      p.invuln=.15;G.shake=.35;
-      if(e.hp<=0){e.dead=true;Species.dna+=Math.round(4+e.size*3);Species.biomass+=Math.max(1,Math.round(e.size));Species.offspring+=0;addLog(`Você caçou ${e.name}. +${Math.round(4+e.size*3)} DNA.`,'good');}
-    },
-    animalAttack(a,p){
-      if(p.invuln>0)return;
-      const mitigation=1-(Species.genes.defense/160);const dmg=Math.max(1,a.damage*mitigation*WeatherSystem.dangerModifier());p.hp-=dmg;p.stun=.08;p.invuln=.35;G.shake=.45;addLog(`${a.name} atacou você: -${Math.round(dmg)} vida.`,'bad');
-      if(Species.genes.thorns>0 && Math.random()<.35){a.hp-=Species.genes.thorns*.35;}
-    }
-  };
-
-  const PlantSystem = {
-    tick(dt){
-      const wm=WeatherSystem.plantModifier();
-      for(const pl of World.plants){
-        if(pl.dead)continue;
-        pl.age+=dt;pl.seedTimer-=dt*wm;
-        const t=WorldSystem.tileAt(pl.x,pl.y);if(!t)continue;
-        const env=(t.moisture+.1)*(Species.genes.plantLight?Species.genes.plantLight/50:1);
-        pl.growth=D.clamp(pl.growth+dt*(.003+env*.002)*wm,0,1.4);
-        if(WeatherSystem.current==='fire' && Math.random()<.009*WeatherSystem.intensity) {pl.hp-=20;pl.growth*=.7;}
-        if(pl.hp<pl.maxHp&&WeatherSystem.current!=='fire')pl.hp=Math.min(pl.maxHp,pl.hp+dt*.25*wm);
-        if(pl.seedTimer<=0 && pl.growth>.78 && World.plants.length<1050){this.disperse(pl);pl.seedTimer=D.rand(15,70);}
-        if(pl.hp<=0)pl.dead=true;
-      }
-    },
-    disperse(parent){
-      const dir=D.rand(0,Math.PI*2);const mode=Math.random();const spread=mode<.33?1.5:mode<.65?3.5:5.5;
-      let x=parent.x+Math.cos(dir)*spread,y=parent.y+Math.sin(dir)*spread;
-      x=D.clamp(x,2,World.width-2);y=D.clamp(y,2,World.height-2);const t=WorldSystem.tileAt(x,y);if(!t||t.water&&parent.kind!=='water')return;
-      if(Math.random()<.55){const spec= D.PLANTS[parent.type];World.plants.push({id:EntitySystem.createId('pl'),x,y,type:parent.type,name:spec.name,kind:spec.kind,hp:35,maxHp:50,growth:.1,age:0,energy:spec.biomass,seedTimer:D.rand(20,80),color:parent.color,discovered:false});}
-    },
-    harvestNearby(){
-      const p=World.player;const target=EntitySystem.nearest(World.plants,p.x,p.y,1.8);if(!target)return false;PlayerSystem.eatPlant(target);return true;
-    }
-  };
-
-  const ResourceSystem = {
-    tick(dt){
-      if(Math.random()<.006*dt){Species.biomass=Math.max(0,Species.biomass-.1);}
-      if(Math.random()<.004*dt){Species.stone=Math.max(0,Species.stone-.03);}
-    },
-    gatherAround(type){
-      const p=World.player;const t=WorldSystem.tileAt(p.x,p.y);if(!t)return 0;
-      let amount=0;
-      if(type==='wood'){amount=D.randi(1,4)+Math.round(Species.genes.collect/40);Species.biomass+=amount;}
-      if(type==='stone'){amount=D.randi(1,3)+Math.round(Species.genes.dig/50);Species.stone+=amount;}
-      if(amount>0)Species.dna+=1;
-      return amount;
-    }
-  };
-
-  const BuildingSystem = {
-    canBuild(def){return Object.entries(def.cost).every(([k,v])=>this.getResource(k)>=v);},
-    getResource(k){if(k==='wood')return Species.biomass;if(k==='stone')return Species.stone;return 0;},
-    spend(cost){for(const [k,v] of Object.entries(cost)){if(k==='wood')Species.biomass-=v;if(k==='stone')Species.stone-=v;}}
-    ,place(id){
-      const def=D.BUILDINGS.find(x=>x.id===id);if(!def)return false;
-      if(!this.canBuild(def)){toast('Recursos insuficientes');return false;}
-      const p=World.player;this.spend(def.cost);
-      World.builds.push({id:EntitySystem.createId('build'),type:def.id,x:p.x+Math.cos(p.dir?0:0)*1.4,y:p.y+.8,hp:def.hp,maxHp:def.hp,age:0,progress:1});
-      Species.buildingsBuilt++;Species.dna+=12;Species.intelligence=Math.max(Species.intelligence,Species.genes.intelligence+Species.buildingsBuilt*.8);
-      addLog(`Construção: ${def.name}.`,'good');toast(`🏠 ${def.name} construída`);updateEra();UIRefresh.all();closeModal('build-modal');return true;
-    },
-    tick(dt){for(const b of World.builds){b.age+=dt;if(b.hp<b.maxHp)b.hp+=dt*.03;}}
-  };
-
-  const TechnologySystem = {
-    unlock(id){
-      const t=D.TECH.find(x=>x.id===id);if(!t||Species.techUnlocked.includes(id))return false;
-      if(Species.dna<t.cost || Species.intelligence<t.req)return false;
-      Species.dna-=t.cost;Species.techUnlocked.push(id);addLog(`Tecnologia descoberta: ${t.name}.`,'good');toast(`⚙️ ${t.name} desbloqueada`);updateEra();UIRefresh.all();return true;
-    },
-    progress(dt){
-      if(World.builds.some(b=>b.type==='workshop'))Species.techProgress+=dt*.2;
-      if(Species.techProgress>60 && !Species.techUnlocked.includes('tools'))this.unlock('tools');
-      if(Species.buildingsBuilt>=4&&!Species.techUnlocked.includes('agriculture'))this.unlock('agriculture');
-      if(Species.buildingsBuilt>=8&&!Species.techUnlocked.includes('advanced_build'))this.unlock('advanced_build');
-    }
-  };
-
-  const TribeSystem = {
-    score(){return Species.population + Species.buildingsBuilt*2 + Species.intelligence*.8 + Species.cultural*.5;},
-    tick(dt){
-      if(Species.intelligence>15 && Species.population>=5)Species.social=D.clamp(Species.social+dt*.03,0,200);
-      if(Species.social>22 && Species.population>=8 && Species.buildingsBuilt>=2 && Species.era==='individuo'){Species.era='grupo';Species.objectiveIndex=Math.max(Species.objectiveIndex,5);addLog('Sua linhagem começa a formar grupos sociais.','good');}
-      if(Species.social>36 && Species.population>=12 && Species.buildingsBuilt>=3 && Species.era!=='tribo'){Species.era='tribo';Species.techProgress+=15;addLog('🎉 Sua comunidade formou uma TRIBO.','good');toast('👥 TRIBO FORMADA');}
-      if(Species.era==='tribo'&&Species.population>=20){Species.cultural=D.clamp(Species.cultural+dt*.04,0,100);}
-    }
-  };
-
-  const CivilizationSystem = {
-    tick(dt){
-      if(Species.era==='tribo'&&Species.population>=20&&Species.techUnlocked.includes('agriculture')){Species.era='aldeia';addLog('🏘️ A tribo tornou-se uma ALDEIA.','good');}
-      if(Species.era==='aldeia'&&Species.population>=35&&Species.techUnlocked.includes('advanced_build')){Species.era='vila';addLog('🏘️ A aldeia cresceu para VILA.','good');}
-      if(Species.era==='vila'&&Species.population>=55&&Species.techUnlocked.includes('metallurgy')){Species.era='cidade';addLog('🏙️ A comunidade alcançou o estágio de CIDADE.','good');}
-      if(Species.era==='cidade'&&Species.cultural>35&&Species.territory>=4){Species.era='civilização';addLog('🌎 Nasceu uma CIVILIZAÇÃO BioEvo.','good');}
-      if(Species.era==='civilização')Species.cultural=Math.min(100,Species.cultural+dt*.03);
-      if(Species.era==='cidade'&&Species.dna>700&&World.biomeDiscovery.size>=5&&!Species.techUnlocked.includes('metallurgy'))TechnologySystem.unlock('metallurgy');
-    }
-  };
-
-  const DiplomacySystem = {
-    entities:[],
-    tick(dt){
-      if(Species.era==='civilização'&&Math.random()<.004*dt){this.meetNeighbor();}
-    },
-    meetNeighbor(){
-      const b=D.BIOME_ORDER.find(id=>!World.biomeDiscovery.has(id));
-      if(b){addLog(`Exploradores avistaram rotas para ${D.BIOMES[b].name}.`,'good');Species.dna+=18;}
-      else {Species.cultural=Math.min(100,Species.cultural+3);addLog('Contato diplomático fortaleceu a cultura.','good');}
-    }
-  };
-
-  const PopulationSystem = {
-    tick(dt){
-      // Distant population is aggregated instead of creating thousands of AI entities.
-      if(World.animals.length>250)World.animals.splice(180,World.animals.length-180);
-      const local=World.animals.length;
-      const carrying=40+Species.biomass*.3+Species.buildingsBuilt*6+Species.techUnlocked.length*5;
-      if(Species.population<carrying && Math.random()<.012*dt){Species.population++;Species.dna+=2;}
-      if(Species.population>Math.max(2,carrying*1.2) && Math.random()<.008*dt){Species.population--;Species.deaths++;}
-      Population.recalc();
-      Population.remote=Math.max(0,Species.population-local);
-      if(Species.population>25){Species.intelligence=Math.min(100,Species.intelligence+dt*.015);}
-    }
-  };
-
-  const EcologySystem = {
-    tick(dt){
-      const w=WeatherSystem.current;
-      if(w==='drought'&&Math.random()<.012*dt){for(let i=0;i<2;i++){const pl=World.plants[D.randi(0,Math.max(0,World.plants.length-1))];if(pl){pl.hp-=8;}}}
-      if(w==='flood'&&Math.random()<.01*dt){for(let i=0;i<2;i++){const a=World.animals[D.randi(0,Math.max(0,World.animals.length-1))];if(a&&!a.kind==='fish')a.y+=D.rand(-.5,.5);}}
-      if(w==='fire'&&Math.random()<.03*dt){World.builds.forEach(b=>{if(Math.random()<.05)b.hp-=2;});}
-      this.balance(dt);
-    },
-    balance(dt){
-      const herb=World.animals.filter(a=>a.diet==='herb').length;const carn=World.animals.filter(a=>a.diet==='carn').length;
-      Population.herbivores=herb;Population.predators=carn;
-      if(World.plants.length<300 && Math.random()<.01*dt)WorldSystem.scatterPlantsSmall(4);
-      Species.dna+=Math.max(0,(World.biomeDiscovery.size-1))*.0006*dt;
-    }
-  };
-
-  // Small ecological refill; kept separate so the main scatter routine is only used during boot.
-  WorldSystem.scatterPlantsSmall=function(count){
-    for(let i=0;i<count;i++){
-      const x=D.rand(2,World.width-2),y=D.rand(2,World.height-2);const t=this.tileAt(x,y);if(!t||t.water&&Math.random()>.3)continue;
-      const key=D.pick(D.BIOMES[t.biome].plants);const spec=D.PLANTS[key];
-      World.plants.push({id:EntitySystem.createId('pl'),x,y,type:key,name:spec.name,kind:spec.kind,hp:35,maxHp:50,growth:.25,age:0,energy:spec.biomass,seedTimer:D.rand(30,70),color:this.plantColor(t.biome),discovered:false});
-    }
-  };
-
-  const SaveSystem = {
-    key:'bioevo_save_v1',
-    save(manual=false){
-      const data={version:D.VERSION,seed:G.seed,species:serializeSpecies(),player:World.player?{x:World.player.x,y:World.player.y,hp:World.player.hp,energy:World.player.energy,water:World.player.water,age:World.player.age}:null,builds:World.builds.map(b=>({...b})),discoveries:[...World.discovered],biomes:[...World.biomeDiscovery],time:G.time,day:G.day,zoom:World.camera.zoom};
-      try{localStorage.setItem(this.key,JSON.stringify(data));if(manual)toast('💾 Jogo salvo localmente');return true;}catch(err){addLog('Não foi possível salvar no navegador.','bad');return false;}
-    },
-    load(manual=false){
-      try{const raw=localStorage.getItem(this.key);if(!raw){toast('Nenhum save encontrado');return false;}const data=JSON.parse(raw);applySave(data);if(manual)toast('📂 Jogo carregado');return true;}catch(err){addLog('Save inválido ou corrompido.','bad');return false;}
-    }
-  };
-
-  const UISystem = {
-    lastObjectiveUpdate:0,
-    refresh(dt=0){
-      UI.speciesName.textContent=Species.name;
-      UI.speciesType.textContent=`${Species.type==='animal'?'Animal':'Vegetal'} • Geração ${Species.generation} • ${formatEra(Species.era)}`;
-      UI.dna.textContent=Math.floor(Species.dna);
-      UI.dnaLarge.textContent=Math.floor(Species.dna);
-      UI.biomass.textContent=Math.floor(Species.biomass);
-      UI.stone.textContent=Math.floor(Species.stone);
-      if(World.player){
-        const hp=World.player.hp,energy=World.player.energy,water=World.player.water;
-        UI.hp.textContent=Math.ceil(hp);UI.energy.textContent=Math.ceil(energy);UI.water.textContent=Math.ceil(water);
-        UI.barHP.style.width=`${D.clamp(hp/Species.genes.hpMax*100,0,100)}%`;
-        UI.barEnergy.style.width=`${D.clamp(energy/Species.genes.energyMax*100,0,100)}%`;
-        UI.barWater.style.width=`${D.clamp(water/Species.genes.waterMax*100,0,100)}%`;
-        UI.speed.textContent=Math.round(Species.genes.speed);UI.defense.textContent=Math.round(Species.genes.defense);UI.jump.textContent=Math.round(Species.genes.jump);UI.vision.textContent=Math.round(Species.genes.vision);
-      }
-      if(dt>0){this.lastObjectiveUpdate-=dt;if(this.lastObjectiveUpdate<=0){this.refreshObjective();this.lastObjectiveUpdate=1;}}
-      this.drawPortrait();
-    },
-    refreshObjective(){
-      const o=D.OBJECTIVES[Math.min(Species.objectiveIndex,D.OBJECTIVES.length-1)];
-      const progress=this.objectiveProgress(o);UI.objectiveTitle.textContent=o.title;UI.objectiveDesc.textContent=o.desc;UI.objectiveProgress.style.width=`${progress*100}%`;
-      if(progress>=1){
-        if(Species.objectiveIndex<D.OBJECTIVES.length-1){Species.objectiveIndex++;Species.objectivesDone=Math.max(Species.objectivesDone,Species.objectiveIndex);Species.dna+=30;addLog(`Marco evolutivo concluído: ${o.title}. +30 DNA.`,'good');}
-      }
-    },
-    objectiveProgress(o){
-      switch(o.id){
-        case'survive':return D.clamp((World.player?.energy||0)/100,.0,1);
-        case'mate':return D.clamp(Species.mates/1,0,1);
-        case'offspring':return D.clamp(Species.offspring/1,0,1);
-        case'evolve':return D.clamp(Species.adaptations.length/1,0,1);
-        case'territory':return D.clamp(Species.territory/3,0,1);
-        case'society':return D.clamp(Species.social/25,0,1);
-        case'tribe':return Species.era==='tribo'||['aldeia','vila','cidade','civilização'].includes(Species.era)?1:0;
-        case'village':return Species.population>=20&&Species.era!=='tribo'&&Species.era!=='grupo'?1:0;
-        case'city':return Species.era==='cidade'||Species.era==='civilização'?1:0;
-        case'civilization':return Species.era==='civilização'?1:0;
-        default:return 0;
-      }
-    },
-    drawPortrait(){
-      if(!Species.genes)return;SP.clear(pctx,portrait.width,portrait.height,'#0b160e');
-      SP.drawPlayer(pctx,portrait.width/2,portrait.height*.56,42,Species.genes,{shadow:false,facing:Species.genes.body==='bird'?1:1});
-      const b=D.BIOMES[Species.currentBiome]||D.BIOMES.cerrado;pctx.fillStyle='#869d89';pctx.font='9px system-ui';pctx.textAlign='center';pctx.fillText(`${b.icon} ${b.name}`,64,119);
-    },
-    drawEvolution(){
-      if(!Species.genes)return;SP.clear(epctx,evoPortrait.width,evoPortrait.height,'#09130c');SP.drawPlayer(epctx,160,180,92,Species.genes,{shadow:false,facing:1});
-    },
-    evolutionOptions(){
-      UI.evoOptions.innerHTML='';
-      for(const m of D.MUTATIONS){
-        const div=document.createElement('div');div.className='evo-option';
-        const left=document.createElement('div');
-        left.innerHTML=`<h3>${m.name} ${Species.adaptations.includes(m.id)?'✓':''}</h3><p>${m.desc}</p>`;
-        const right=document.createElement('div');right.innerHTML=`<div class="cost">🧬 ${m.cost}</div>`;
-        const btn=document.createElement('button');btn.textContent=Species.adaptations.includes(m.id)?'ADQUIRIDA':'EVOLUIR';btn.disabled=Species.adaptations.includes(m.id)||Species.dna<m.cost;btn.onclick=()=>{if(Genetics.apply(m.id))this.evolutionOptions();};
-        right.appendChild(btn);div.appendChild(left);div.appendChild(right);UI.evoOptions.appendChild(div);
-      }
-    },
-    lineage(){
-      UI.lineageTree.innerHTML='';
-      const root={generation:1,name:Species.name.split(' ')[0],info:'ancestral',traits:null};
-      const arr=[root,...Species.lineage];
-      arr.forEach((n,i)=>{const d=document.createElement('div');d.className=`lineage-node ${i===arr.length-1?'current':''}`;d.innerHTML=`<div class="gen">Geração ${n.generation||1}</div><div class="nm">${n.name||'Ancestral'}</div><div class="info">${i===arr.length-1?'VOCÊ':'ramificação'}<br>${n.traits?`Vel ${Math.round(n.traits.speed)} • Def ${Math.round(n.traits.defense)}`:''}</div>`;UI.lineageTree.appendChild(d);});
-    },
-    map(){
-      const c=UI.mapCanvas,x=c.getContext('2d');SP.clear(x,c.width,c.height,'#0b160e');
-      const scale=Math.min(c.width/World.width,c.height/World.height);for(let y=0;y<World.height;y+=2)for(let xx=0;xx<World.width;xx+=2){const t=World.tiles[y*World.width+xx];if(!t)continue;const b=D.BIOMES[t.biome];x.fillStyle=t.water?'#356f82':b.base;x.fillRect(xx*scale,y*scale,2*scale+1,2*scale+1);}
-      const pp=CameraSystem.worldToScreen(World.player.x,World.player.y);const mx=World.player.x*scale,my=World.player.y*scale;x.fillStyle='#f2f0c9';x.beginPath();x.arc(mx,my,5,0,Math.PI*2);x.fill();
-      UI.mapLegend.innerHTML=D.BIOME_ORDER.map(id=>`<span>${D.BIOMES[id].icon} ${D.BIOMES[id].name}</span>`).join('');
-    }
-  };
-  const UIRefresh=UISystem;
-
-  const RenderSystem = {
-    accumulator:0,
-    render(){
-      resizeCanvas();
-      const light=TimeSystem.getLight();
-      ctx.save();
-      ctx.imageSmoothingEnabled=false;
-      ctx.fillStyle='#07100a';ctx.fillRect(0,0,canvas.width,canvas.height);
-      this.drawWorld(light);
-      this.drawEntities(light);
-      this.drawWeather();
-      this.drawVignette(light);
-      this.drawTopWorldInfo();
-      ctx.restore();
-    },
-    drawWorld(light){
-      const scale=D.TILE*World.camera.zoom;
-      const left=Math.floor(World.camera.x-canvas.width/(2*scale))-2;
-      const right=Math.ceil(World.camera.x+canvas.width/(2*scale))+2;
-      const top=Math.floor(World.camera.y-canvas.height/(2*scale))-2;
-      const bottom=Math.ceil(World.camera.y+canvas.height/(2*scale))+2;
-      for(let ty=top;ty<=bottom;ty++){
-        for(let tx=left;tx<=right;tx++){
-          if(tx<0||ty<0||tx>=World.width||ty>=World.height)continue;
-          const t=World.tiles[ty*World.width+tx];const b=D.BIOMES[t.biome];
-          const sx=(tx-World.camera.x)*scale+canvas.width/2,sy=(ty-World.camera.y)*scale+canvas.height/2;
-          let c=b.base;
-          if(t.water)c=b.water;
-          const n=D.hash(tx,ty,G.seed+4);if(!t.water && n>.76)c=b.light;if(!t.water&&n<.12)c=b.dark;
-          ctx.fillStyle=c;ctx.fillRect(Math.floor(sx),Math.floor(sy),Math.ceil(scale+1),Math.ceil(scale+1));
-          this.tileDecoration(t,tx,ty,sx,sy,scale,n);
-        }
-      }
-      ctx.globalAlpha=.12;ctx.fillStyle='#fff';for(let i=0;i<World.discovered.size/20;i++){/* intentional cheap fog texture */}ctx.globalAlpha=1;
-    },
-    tileDecoration(t,tx,ty,sx,sy,s,n){
-      if(s<16)return;
-      const k=(tx*13+ty*7)%11;
-      if(t.water){if(k<3){ctx.strokeStyle='rgba(180,235,232,.25)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(sx+3,sy+s*.45);ctx.lineTo(sx+s*.75,sy+s*.45);ctx.stroke();}return;}
-      if(k===0){ctx.fillStyle='rgba(0,0,0,.16)';ctx.fillRect(sx+s*.2,sy+s*.65,s*.48,s*.1);}
-      if(k===1||k===6){ctx.fillStyle='rgba(0,0,0,.14)';ctx.fillRect(sx+s*.55,sy+s*.6,2,5);}
-      if(k===2){ctx.fillStyle='rgba(255,233,142,.22)';ctx.fillRect(sx+s*.15,sy+s*.23,2,2);}
-    },
-    drawEntities(light){
-      const scale=D.TILE*World.camera.zoom;
-      const sx=World.player?CameraSystem.worldToScreen(World.player.x,World.player.y):{x:canvas.width/2,y:canvas.height/2};
-      const visiblePlants=[];const visibleAnimals=[];const rangeX=canvas.width/(2*scale)+3,rangeY=canvas.height/(2*scale)+3;
-      for(const pl of World.plants){if(Math.abs(pl.x-World.camera.x)<rangeX&&Math.abs(pl.y-World.camera.y)<rangeY)visiblePlants.push(pl);}
-      for(const a of World.animals){if(Math.abs(a.x-World.camera.x)<rangeX&&Math.abs(a.y-World.camera.y)<rangeY)visibleAnimals.push(a);}
-      visiblePlants.sort((a,b)=>a.y-b.y);for(const pl of visiblePlants){const q=CameraSystem.worldToScreen(pl.x,pl.y);SP.drawPlant(ctx,q.x,q.y,Math.max(7,11*scale/1.8),pl,{color:pl.color},{growth:pl.growth,phase:G.time});}
-      for(const b of World.builds){if(Math.abs(b.x-World.camera.x)<rangeX&&Math.abs(b.y-World.camera.y)<rangeY){const q=CameraSystem.worldToScreen(b.x,b.y);SP.drawBuilding(ctx,q.x,q.y,b,Math.max(.6,scale/18));}}
-      visibleAnimals.sort((a,b)=>a.y-b.y);for(const a of visibleAnimals){const q=CameraSystem.worldToScreen(a.x,a.y);SP.drawAnimal(ctx,q.x,q.y,Math.max(7,a.size*10*scale/1.8),a,{facing:a.facing||1,alpha:.96});}
-      if(World.player)SP.drawPlayer(ctx,sx.x,sx.y,Math.max(9,11*scale/1.8),Species.genes,{facing:World.player.dir,attack:World.player.attackTimer>.1});
-      this.drawSelection();
-    },
-    drawSelection(){
-      if(!World.player)return;const p=World.player;
-      ctx.strokeStyle='rgba(218,244,188,.55)';ctx.lineWidth=1;ctx.beginPath();const q=CameraSystem.worldToScreen(p.x,p.y);ctx.ellipse(q.x,q.y+12,22,6,0,0,Math.PI*2);ctx.stroke();
-      if(p.target){const t=CameraSystem.worldToScreen(p.target.x,p.target.y);ctx.strokeStyle='rgba(232,219,147,.5)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(t.x,t.y);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.arc(t.x,t.y,7,0,Math.PI*2);ctx.stroke();}
-    },
-    drawWeather(){
-      const type=WeatherSystem.current;if(type==='clear')return;
-      const count=Math.floor(40*(WeatherSystem.intensity||.5));for(let i=0;i<count;i++){
-        const x=(D.hash(i,G.day,G.seed+10)*canvas.width),y=(D.hash(i+2,G.day,G.seed+20)*canvas.height);
-        SP.drawWeatherParticle(ctx,x,y,(type==='rain'||type==='storm')?'rain':type==='frost'?'snow':type==='fire'?'fire':'ash',10,G.time+i);
-      }
-    },
-    drawVignette(light){
-      const g=ctx.createRadialGradient(canvas.width/2,canvas.height/2,Math.min(canvas.width,canvas.height)*.15,canvas.width/2,canvas.height/2,Math.max(canvas.width,canvas.height)*.7);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(0,0,0,${.56*(1-light)+.18})`);ctx.fillStyle=g;ctx.fillRect(0,0,canvas.width,canvas.height);
-    },
-    drawTopWorldInfo(){
-      const b=D.BIOMES[WorldSystem.biomeAt(World.player?.x||0,World.player?.y||0)]||D.BIOMES.cerrado;
-      ctx.fillStyle='rgba(7,14,9,.75)';ctx.fillRect(12,12,260,48);ctx.strokeStyle='rgba(67,95,70,.7)';ctx.strokeRect(12,12,260,48);
-      ctx.fillStyle='#e6f1df';ctx.font='bold 12px system-ui';ctx.fillText(`${b.icon} ${b.name}`,22,31);
-      ctx.fillStyle='#97aa9a';ctx.font='10px system-ui';ctx.fillText(`${TimeSystem.label()}  •  ${(D.WEATHER[WeatherSystem.current]||D.WEATHER.clear).name}`,22,47);
-      ctx.fillStyle='#a7bd9f';ctx.fillText(`Pop. ${Math.round(Species.population)}  •  ${Population.predators} predadores`,22,59);
-      if(G.paused){ctx.fillStyle='#f2d27d';ctx.font='bold 18px system-ui';ctx.fillText('PAUSADO',canvas.width/2-45,38);}
-    }
-  };
-
-  const Game = {
-    start(){
-      Species.name=(UI.inputSpecies.value.trim()||'Carijó').slice(0,18);
-      Species.currentBiome=G.selectedBiome;
-      Species.genes=Genetics.createSeed('walker');Species.id=`${Species.name.toLowerCase().replace(/\W+/g,'_')}_1`;Species.color=Species.genes.color;Species.generation=1;Species.dna=120;Species.population=1;Species.territory=1;Species.adaptations=[];Species.lineage=[];Species.offspring=0;Species.mates=0;Species.births=0;Species.deaths=0;Species.era='individuo';Species.techUnlocked=['stone'];Species.cultural=0;Species.intelligence=5;Species.social=5;Species.objectiveIndex=0;Species.objectivesDone=0;Species.biomass=0;Species.stone=0;Species.traitHistory=[];
-      UI.start.classList.add('hidden');G.modalOpen=false;UI.loading.classList.remove('hidden');
-      setTimeout(()=>{WorldSystem.generate();WorldSystem.scatterAnimals();WorldSystem.discovered.clear();World.biomeDiscovery.clear();PlayerSystem.create();WorldSystem.discoverAroundPlayer();WeatherSystem.choose();UISystem.refresh();UI.loading.classList.add('hidden');G.running=true;G.paused=false;addLog('A linhagem começou sua jornada.','good');requestAnimationFrame(Game.loop);},30);
-    },
-    loop(now){
-      if(!G.running)return;const dt=Math.min(.05,(now-G.last)/1000);G.last=now;
-      if(!G.paused){this.update(dt);}
-      RenderSystem.render();
-      requestAnimationFrame(Game.loop);
-    },
-    update(dt){
-      TimeSystem.tick(dt);WeatherSystem.tick(dt);PlayerSystem.update(dt);WorldSystem.discoverAroundPlayer();
-      G.simAccumulator+=dt;G.weatherAccumulator+=dt;G.popAccumulator+=dt;G.uiAccumulator+=dt;
-      if(G.simAccumulator>.12){const step=G.simAccumulator;G.simAccumulator=0;AISystem.tick(step);PlantSystem.tick(step);EcologySystem.tick(step);ResourceSystem.tick(step);BuildingSystem.tick(step);TribeSystem.tick(step);CivilizationSystem.tick(step);DiplomacySystem.tick(step);TechnologySystem.progress(step);PopulationSystem.tick(step);EntitySystem.removeDead();}
-      if(G.uiAccumulator>.22){UIRefresh.refresh(G.uiAccumulator);G.uiAccumulator=0;}
-      if(G.popAccumulator>18){G.popAccumulator=0;SaveSystem.save(false);}
-      PlayerSystem.habitatAdaptation();updateEra();
-    },
-    togglePause(){G.paused=!G.paused;UI.pause.textContent=G.paused?'Continuar':'Pausar';toast(G.paused?'Jogo pausado':'Jogo retomado');}
-  };
-
-  function updateEra(){
-    if(Species.intelligence>15&&Species.era==='individuo')Species.era='grupo';
-    if(Species.intelligence>25&&Species.social>30&&Species.population>=8&&Species.era==='grupo')Species.era='tribo';
-    if(Species.era==='tribo'&&Species.population>=20&&Species.techUnlocked.includes('agriculture'))Species.era='aldeia';
   }
-
-  function onNewDay(){
-    Species.dna+=Math.round(3+World.biomeDiscovery.size);
-    Species.lifetimeBest=Math.max(Species.lifetimeBest,Species.generation);
-    if(Species.population>4){Species.intelligence=Math.min(100,Species.intelligence+.25);Species.social=Math.min(100,Species.social+.18);}
-    addLog(`Novo dia. +${3+World.biomeDiscovery.size} DNA pela experiência da linhagem.`,'good');
+  this.carveRivers();
+  this.seedResources();
+};
+WorldSystem.carveRivers=function(){
+  const rivers=3+randi(0,2);
+  for(let r=0;r<rivers;r++){
+    let x=randi(5,D.WORLD_W-6), y=0;
+    for(let s=0;s<D.WORLD_H;s++){
+      const w=2+(r%3);
+      for(let yy=-w;yy<=w;yy++)for(let xx=-w;xx<=w;xx++){
+        const tx=clamp(x+xx,0,D.WORLD_W-1),ty=clamp(y+yy,0,D.WORLD_H-1);
+        if(xx*xx+yy*yy<=w*w)Game.world.moisture[key(tx,ty)]=1;
+      }
+      x=clamp(x+randi(-2,2),2,D.WORLD_W-3);y++;
+    }
   }
-
-  function spawnMateNear(){
-    if(World.animals.length>240)return;
-    const p=World.player;const mate={id:EntitySystem.createId('mate'),type:Species.id,x:p.x+D.rand(-2.5,2.5),y:p.y+D.rand(-2.5,2.5),name:'Parceiro',kind:Species.genes.body==='fish'?'fish':Species.genes.body==='bird'?'bird':'land',hp:Species.genes.hpMax*.8,maxHp:Species.genes.hpMax*.8,energy:80,water:80,age:Species.genes.maturity+5,maturity:Species.genes.maturity,speed:Species.genes.speed*.95,damage:5,size:Species.genes.size,diet:'herb',color:Species.genes.color,state:'mating',target:p,genes:Genetics.cloneGenes(Species.genes),dir:0,think:1,pack:1,foodCooldown:0,breedCooldown:0,facing:1};World.animals.push(mate);Species.population=Math.max(Species.population,2);Population.recalc();
+};
+WorldSystem.seedResources=function(){
+  Game.plants=[];Game.animals=[];Game.buildings=[];
+  for(let i=0;i<420;i++)this.spawnPlant();
+  for(let i=0;i<170;i++)this.spawnAnimal();
+};
+WorldSystem.spawnPlant=function(){
+  const x=randi(2,D.WORLD_W-3),y=randi(2,D.WORLD_H-3),b=D.BIOME_ORDER[tile(x,y)];
+  const spec=D.PLANTS[pick(D.BIOMES[b].plants)]||D.PLANTS.graminea;
+  Game.plants.push({id:'p_'+Math.random().toString(36).slice(2),x:x+.5,y:y+.5,species:spec.id,age:rand()*80,water:spec.water,growth:spec.growth,energy:rand(),seed:rand()});
+};
+WorldSystem.spawnAnimal=function(){
+  const x=randi(3,D.WORLD_W-4),y=randi(3,D.WORLD_H-4),b=D.BIOME_ORDER[tile(x,y)];
+  const sid=pick(D.BIOMES[b].animals);const spec=D.ANIMALS[sid]||D.ANIMALS.capivara;
+  const role=spec.role;const genes={body:role==='voador'?'bird':role==='aquático'?'fish':'quadruped',color:spec.color,speed:42*spec.speed,defense:24,vision:spec.vision/2,attack:spec.attack,feed:spec.feed};
+  Game.animals.push({id:'a_'+Math.random().toString(36).slice(2),x:x+.5,y:y+.5,species:sid,role,state:'wander',vx:0,vy:0,hunger:rand()*50,thirst:rand()*50,energy:70+rand()*30,age:rand()*100,genes,personality:{aggressive:rand(),curious:rand(),social:rand(),territorial:rand()},cool:rand()*10});
+};
+BiomeSystem.at=function(x,y){const tx=clamp(Math.floor(x),0,D.WORLD_W-1),ty=clamp(Math.floor(y),0,D.WORLD_H-1);return D.BIOMES[D.BIOME_ORDER[tile(tx,ty)]];};
+BiomeSystem.habitat=function(g,x,y){const b=this.at(x,y);const temp=b.temp+WeatherSystem.tempOffset();const heat=g.heat||40,cold=g.cold||40;const tempFit=100-Math.min(100,Math.abs(temp-24)*2.4);const waterFit=clamp((b.water+g.drought-35),0,100);return clamp((tempFit+(waterFit)+((g.speed||0))/3)/2.3,0,100);};
+BiomeSystem.discover=function(biomeId){if(Game.discoveries.has(biomeId))return;Game.discoveries.add(biomeId);Game.species.dna+=35;say('Novo bioma descoberto: '+D.BIOMES[biomeId].name+' • +35 DNA');};
+EvolutionSystem.newSpecies=function(name,biome){
+  const genes=normGenes({body:'quadruped',color:['#799c53','#b47b52','#6594a6','#9e8b54'][randi(0,3)],size:1.0,speed:48,jump:18,vision:52});
+  Game.species={name:name||'Carijó',type:'Terrestre',genes,dna:120,biomass:12,stone:28,population:1,generation:1,knowledge:0,culture:0,technology:0,settlementLevel:0,relations:{},inventory:{madeira:30,pedra:28,agua:55,frutas:24,sementes:14,fibras:12,argila:5,minerio:0,carne:4,peixe:0},mutations:[],unlockedTech:['stone'],season:1,foodMemory:0,explored:[],history:['A linhagem nasceu em '+D.BIOMES[biome].name+'.']};
+  Game.player={id:'hero_1',x:D.WORLD_W/2,y:D.WORLD_H/2,hp:genes.hpMax,energy:genes.energyMax,water:genes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
+  // relocate player to a matching tile
+  for(let tries=0;tries<800;tries++){const x=randi(6,D.WORLD_W-7),y=randi(6,D.WORLD_H-7);if(D.BIOME_ORDER[tile(x,y)]===biome){Game.player.x=x+.5;Game.player.y=y+.5;break;}}
+  Game.lineage=[{id:'g1',name:Game.species.name,generation:1,biome,parents:[],note:'Fundação da linhagem.'}];
+  Game.discoveries=new Set([biome]);
+};
+EvolutionSystem.mutateChild=function(mother,father){
+  const keys=['speed','jump','climb','dig','swim','flight','vision','hearing','smell','perception','hunt','collect','feed','fertility','cold','heat','drought','defense','hpMax','energyMax','waterMax','intelligence','social','build'];
+  const child=normGenes();
+  for(const k of keys){const a=Number(mother[k]??D.START_GENES[k]??0),b=Number(father[k]??D.START_GENES[k]??0);child[k]=clamp(a*.55+b*.45+(rand()-.5)*Math.max(2,(a+b)*.05),0,200);}
+  child.body=rand()<.5?mother.body:father.body;child.color=rand()<.5?mother.color:father.color;child.size=clamp(((mother.size||1)+(father.size||1))/2+(rand()-.5)*.18,.65,1.6);
+  if(rand()<.08){const pool=D.MUTATIONS.filter(m=>!Game.species.mutations.includes(m.id));if(pool.length){const m=pick(pool);for(const [k,v] of Object.entries(m.effect))if(typeof v==='number')child[k]=(child[k]||0)+v;child._mutation=m.id;}}
+  return child;
+};
+EvolutionSystem.buy=function(id){const m=D.MUTATIONS.find(x=>x.id===id);if(!m||Game.species.dna<m.cost||Game.species.mutations.includes(id))return false;Game.species.dna-=m.cost;Game.species.mutations.push(id);for(const[k,v]of Object.entries(m.effect)){Game.species.genes[k]=(Game.species.genes[k]||0)+v;}Game.species.history.push('Adaptação adquirida: '+m.name);say('Evolução adquirida: '+m.name);return true;};
+PlayerSystem={};
+PlayerSystem.update=function(dt){
+  const p=Game.player,g=Game.species.genes;if(!p||!p.alive)return;
+  const ix=(Game.keys.a||Game.keys.ArrowLeft?-1:0)+(Game.keys.d||Game.keys.ArrowRight?1:0);const iy=(Game.keys.w||Game.keys.ArrowUp?-1:0)+(Game.keys.s||Game.keys.ArrowDown?1:0);
+  let mx=ix,my=iy;if(mx||my){const len=Math.hypot(mx,my);mx/=len;my/=len;p.facing=mx<0?-1:mx>0?1:p.facing;const biome=BiomeSystem.at(p.x,p.y);const speed=(g.speed||48)/42*D.TILE*dt*biome.movement;p.x=clamp(p.x+mx*speed/D.TILE,.8,D.WORLD_W-.8);p.y=clamp(p.y+my*speed/D.TILE,.8,D.WORLD_H-.8);p.energy=clamp(p.energy-dt*(.5+(g.energyDrain||.035)*20)* (mx||my?1.8:1),0,g.energyMax||100);}
+  p.energy=clamp(p.energy-dt*(g.energyDrain||.035)*5,0,g.energyMax||100);p.water=clamp(p.water-dt*(g.waterDrain||.018)*4,0,g.waterMax||100);p.age+=dt*.06;p.foodCooldown-=dt;p.mateCooldown-=dt;p.attackCooldown-=dt;
+  const b=BiomeSystem.at(p.x,p.y);if(!Game.discoveries.has(b.id))BiomeSystem.discover(b.id);
+  if(p.water<=0)p.hp-=dt*2.2;if(p.energy<=0)p.hp-=dt*1.4;if(p.hp<=0)this.die();
+  if(rand()<dt*.08)ResourceSystem.collectNearby();
+};
+PlayerSystem.die=function(){if(!Game.player.alive)return;Game.player.alive=false;say('Sua linhagem perdeu o indivíduo. Se houver descendentes, você assumirá o próximo.');setTimeout(()=>ReproductionSystem.takeOverDescendant(),900);};
+PlayerSystem.eat=function(){if(Game.player.foodCooldown>0)return;const target=ResourceSystem.nearestFood();if(target){const f=D.FOOD.fruta;Game.player.energy=clamp(Game.player.energy+f.energy,0,Game.species.genes.energyMax);Game.player.water=clamp(Game.player.water+f.water,0,Game.species.genes.waterMax);Game.species.dna+=f.dna;Game.species.biomass+=f.biomass;target.growth=Math.max(0,target.growth-18);Game.player.foodCooldown=2.8;spawnFloat('+'+f.energy+' energia',Game.player.x,Game.player.y,'good');}}
+PlayerSystem.attack=function(){if(Game.player.attackCooldown>0)return;const prey=Game.animals.filter(a=>dist(a,Game.player)<2.0).sort((a,b)=>dist(a,Game.player)-dist(b,Game.player))[0];if(!prey){say('Nenhum animal ao alcance.');return;}const dmg=Math.max(2,(Game.species.genes.speed||40)*.18+(Game.species.genes.defense||20)*.08+randi(2,8));prey.hp=(prey.hp||24)-dmg;Game.player.attackCooldown=1.1;spawnFloat('-'+Math.round(dmg),prey.x,prey.y,'bad');if(prey.hp<=0){const gain=5+Math.floor((D.ANIMALS[prey.species]?.attack||10)/8);Game.species.dna+=gain;Game.species.inventory.carne=(Game.species.inventory.carne||0)+1;say('Caça bem-sucedida • +'+gain+' DNA');Game.animals.splice(Game.animals.indexOf(prey),1);}}
+PlantSystem.update=function(dt){
+  for(const p of Game.plants){
+    const b=BiomeSystem.at(p.x,p.y);const weather=D.WEATHER[Game.weather];const sun=Math.max(0,Math.sin((Game.hour/24)*Math.PI));p.age+=dt*(.2+b.water*.004)*weather.plant; p.water=clamp(p.water+dt*(b.water*.08+weather.water*.02),0,120);p.growth=clamp(p.growth+dt*(b.water/80)*weather.plant*(.35+(Game.world.fertility[key(Math.floor(p.x),Math.floor(p.y))]||.5)),0,160); if(Game.weather==='fire'&&rand()<dt*.015)p.growth-=22;if(p.growth<8&&rand()<dt*.02)p.growth=0; if(p.growth<8&&rand()<dt*.08)p.growth=20+rand()*50;
   }
-
-  function interact(){
-    if(!World.player)return;
-    const p=World.player;
-    const mate=EntitySystem.nearest(World.animals.filter(a=>a.type===Species.id||a.id.startsWith('mate_')),p.x,p.y,1.5);
-    if(mate && p.maturity){PlayerSystem.reproduceWith(mate);return;}
-    if(WorldSystem.isWater(p.x,p.y)){PlayerSystem.drink();return;}
-    if(PlantSystem.harvestNearby())return;
-    const b=EntitySystem.nearest(World.builds,p.x,p.y,2);if(b){toast('Estrutura: '+(D.BUILDINGS.find(x=>x.id===b.type)?.name||b.type));return;}
-    ResourceSystem.gatherAround('wood');
+  while(Game.plants.length<380&&rand()<dt*.12)WorldSystem.spawnPlant();
+};
+ResourceSystem.nearestFood=function(){
+  const px=Game.player.x,py=Game.player.y;let best=null,bestD=2.4;for(const plant of Game.plants){if(plant.growth<25)continue;const d=Math.hypot(px-plant.x,py-plant.y);if(d<bestD){best=plant;bestD=d;}}return best;
+};
+ResourceSystem.collectNearby=function(){
+  const p=Game.player;if(!p)return;for(const plant of Game.plants){if(Math.hypot(p.x-plant.x,p.y-plant.y)<.9&&plant.growth>35&&rand()<.25){Game.species.inventory.frutas=(Game.species.inventory.frutas||0)+1;Game.species.biomass+=1;plant.growth-=18;Game.species.dna+=1;}}
+};
+AnimalAISystem.update=function(dt){
+  const p=Game.player;
+  for(let i=Game.animals.length-1;i>=0;i--){
+    const a=Game.animals[i];const spec=D.ANIMALS[a.species]||{};a.age+=dt*.04;a.hunger+=dt*(.4+spec.feed*.003);a.thirst+=dt*.28;a.energy=clamp(a.energy-dt*.7,0,100);a.cool-=dt;
+    const nearP=dist(a,p);let target=null;let targetD=Infinity;
+    if(nearP<Math.min(4,(a.genes.vision||30)/18)){a.state=spec.role==='predador'&&nearP<3?'hunt':(p&&nearP<1.25?'flee':'observe');}
+    if(a.hunger>72){let food=Game.plants.find(q=>q.growth>30&&dist(a,q)<2.7);if(food&&dist(a,food)<targetD){target=food;targetD=dist(a,food);a.state='feed';}}
+    if(spec.role==='predador'&&p&&nearP<3.0&&a.personality.aggressive>.58){target=p;a.state='hunt';}
+    if(!target||targetD>2.7){if(a.cool<=0){a.vx=(rand()-.5)*2;a.vy=(rand()-.5)*2;a.cool=1+rand()*4;}target={x:a.x+a.vx*2,y:a.y+a.vy*2};}
+    let mult=0.015*spec.speed; if(a.state==='flee')mult*=1.4;if(a.state==='hunt')mult*=1.25;const dx=target.x-a.x,dy=target.y-a.y,len=Math.hypot(dx,dy)||1;a.x=clamp(a.x+dx/len*mult*dt,.5,D.WORLD_W-.5);a.y=clamp(a.y+dy/len*mult*dt,.5,D.WORLD_H-.5);
+    if(a.state==='feed'&&targetD<.7){a.hunger=Math.max(0,a.hunger-26);a.energy=clamp(a.energy+12,0,100);if(target.growth!==undefined)target.growth-=14;}
+    if(a.state==='hunt'&&p&&nearP<1.15&&a.cool<=0){p.hp-=Math.max(2,(spec.attack||8)*.07);a.cool=1.2;spawnFloat('-'+Math.round(spec.attack*.07),p.x,p.y,'bad');}
+    if(a.hunger>98||a.thirst>98||a.energy<2){if(rand()<dt*.03){Game.animals.splice(i,1);continue;}}
+    if(a.age>220&&rand()<dt*.01){Game.animals.splice(i,1);continue;}
+    if(nearP<2.6&&a.energy>45&&a.hunger<45&&rand()<dt*.002){ReproductionSystem.spawnWildChild(a);}
   }
+  while(Game.animals.length<D.MAX_ACTIVE_ENTITIES*.62&&rand()<dt*.08)WorldSystem.spawnAnimal();
+};
+ReproductionSystem.spawnWildChild=function(parent){const child=Object.assign({},parent,{id:'a_'+Math.random().toString(36).slice(2),x:parent.x+(rand()-.5),y:parent.y+(rand()-.5),age:0,hunger:10,energy:80});child.genes=normGenes(parent.genes);Game.animals.push(child);};
+ReproductionSystem.tryBreed=function(){
+  const p=Game.player,g=Game.species.genes;if(p.mateCooldown>0)return;const mate=Game.animals.find(a=>dist(a,p)<1.8&&a.role!=='predador');if(!mate){say('Procure um parceiro compatível próximo.');return;}if(p.energy<30||p.water<25){say('Você precisa de energia e água para reproduzir.');return;}p.energy-=18;p.water-=8;p.mateCooldown=7;const childGenes=EvolutionSystem.mutateChild(g,mate.genes);const child={id:'desc_'+(Game.lineage.length+1),name:Game.species.name+' • '+(Game.lineage.length+1),genes:childGenes,generation:Game.species.generation+1,parents:[Game.player.id,mate.id],bornDay:Game.day};Game.lineage.push(child);Game.species.population+=1;Game.species.dna+=28;Game.species.generation=Math.max(Game.species.generation,child.generation);Game.player=Object.assign({hp:childGenes.hpMax,energy:childGenes.energyMax,water:childGenes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0}, {id:child.id,x:p.x+.7,y:p.y+.4});Game.species.genes=childGenes;if(childGenes._mutation){const m=D.MUTATIONS.find(x=>x.id===childGenes._mutation);if(m&&!Game.species.mutations.includes(m.id))Game.species.mutations.push(m.id);say('Nasceu um descendente com mutação: '+(m?m.name:childGenes._mutation));}else say('Nova geração assumida: geração '+child.generation);return true;
+};
+ReproductionSystem.takeOverDescendant=function(){const child=Game.lineage.slice().reverse().find(x=>x.genes&&!x.taken);if(!child){say('A linhagem acabou. Pressione R para tentar reconstruir a população.');return;}child.taken=true;Game.player={id:child.id,x:Game.player?.x||D.WORLD_W/2,y:Game.player?.y||D.WORLD_H/2,hp:child.genes.hpMax,energy:child.genes.energyMax,water:child.genes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};Game.species.genes=normGenes(child.genes);Game.species.generation=child.generation;say('Você assumiu o controle de '+child.name+'.');};
 
-  function useAbility(){
-    const p=World.player;if(!p)return;
-    if(WorldSystem.isWater(p.x,p.y)){PlayerSystem.drink();return;}
-    if(p.energy<12){toast('Energia insuficiente');return;}
-    p.energy-=10;Species.dna+=5;Species.genes.perception+=1;addLog('Comportamento adaptativo praticado. +5 DNA.','good');
-  }
-
-  function openEvolution(){
-    UI.evoModal.classList.remove('hidden');G.modalOpen=true;UIRefresh.evolutionOptions();UIRefresh.drawEvolution();
-  }
-  function openLineage(){UI.lineageModal.classList.remove('hidden');G.modalOpen=true;UIRefresh.lineage();}
-  function openMap(){UI.mapModal.classList.remove('hidden');G.modalOpen=true;UIRefresh.map();}
-  function openBuild(){UI.buildModal.classList.remove('hidden');G.modalOpen=true;UI.buildOptions.innerHTML='';for(const b of D.BUILDINGS){const row=document.createElement('div');row.className='build-option';const left=document.createElement('div');left.innerHTML=`<b>${b.name}</b><p>${b.desc}</p><span class="mat">🪵 ${b.cost.wood||0} • 🪨 ${b.cost.stone||0}</span>`;const btn=document.createElement('button');btn.textContent='CONSTRUIR';btn.disabled=!BuildingSystem.canBuild(b);btn.onclick=()=>BuildingSystem.place(b.id);row.appendChild(left);row.appendChild(btn);UI.buildOptions.appendChild(row);}}
-  function closeModal(id){const el=document.getElementById(id);if(el)el.classList.add('hidden');G.modalOpen=[UI.evoModal,UI.lineageModal,UI.mapModal,UI.buildModal].some(m=>!m.classList.contains('hidden'));}
-  function closeAllModals(){[UI.evoModal,UI.lineageModal,UI.mapModal,UI.buildModal].forEach(m=>m.classList.add('hidden'));G.modalOpen=false;}
-
-  function makeSpeciesName(base,g){
-    const suffixes=['Nova','Verde','do Campo','Ribeira','da Mata','do Cerrado','Caçadora','do Sol','do Rio','Nativa'];
-    const root=(base||'Carijó').split(' ')[0];return g===1?root:`${root} ${D.pick(suffixes)}`;
-  }
-
-  function traitSnapshot(g){return {speed:g.speed,defense:g.defense,jump:g.jump,vision:g.vision,heat:g.heat,cold:g.cold,swim:g.swim,flight:g.flight,intelligence:g.intelligence,social:g.social};}
-
-  function serializeSpecies(){return JSON.parse(JSON.stringify(Species));}
-
-  function applySave(data){
-    if(!data||!data.species)return;
-    Object.assign(Species,data.species);Species.genes=Genetics.clampGeneSet(Species.genes||Genetics.createSeed('walker'));
-    G.seed=data.seed||G.seed;G.time=data.time||0;G.day=data.day||1;World.camera.zoom=data.zoom||1;Species.currentBiome=Species.currentBiome||'cerrado';
-    WorldSystem.generate();World.builds=Array.isArray(data.builds)?data.builds:[];World.discovered=new Set(data.discoveries||[]);World.biomeDiscovery=new Set(data.biomes||[]);
-    PlayerSystem.create();if(data.player){World.player.x=data.player.x;World.player.y=data.player.y;World.player.hp=data.player.hp;World.player.energy=data.player.energy;World.player.water=data.player.water;World.player.age=data.player.age||0;}
-    UI.start.classList.add('hidden');UI.loading.classList.add('hidden');G.running=true;G.paused=false;closeAllModals();UIRefresh.refresh();addLog('Save restaurado.','good');requestAnimationFrame(Game.loop);
-  }
-
-  function toast(text){
-    UI.toast.textContent=text;UI.toast.classList.add('show');G.toastTimer=1.8;
-    clearTimeout(G._toastTimeout);G._toastTimeout=setTimeout(()=>UI.toast.classList.remove('show'),1800);
-  }
-
-  function addLog(text,kind=''){const el=document.createElement('div');el.className=`log-item ${kind}`;el.textContent=text;UI.log.prepend(el);while(UI.log.children.length>30)UI.log.removeChild(UI.log.lastChild);}
-
-  function formatEra(era){return ({individuo:'Indivíduo',grupo:'Grupo',tribo:'Tribo',aldeia:'Aldeia',vila:'Vila',cidade:'Cidade',civilização:'Civilização'})[era]||era;}
-
-  function resizeCanvas(){
-    const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
-    const dpr=Math.min(window.devicePixelRatio||1,1.5);const w=Math.round(rect.width*dpr),h=Math.round(rect.height*dpr);
-    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;ctx.imageSmoothingEnabled=false;}
-  }
-
-  function setupStartScreen(){
-    UI.startBiomes.innerHTML='';
-    for(const id of D.BIOME_ORDER){const b=D.BIOMES[id];const btn=document.createElement('button');btn.className=`biome-choice ${id===G.selectedBiome?'selected':''}`;btn.innerHTML=`<div class="bname">${b.icon} ${b.name}</div><div class="desc">${b.desc}</div>`;btn.onclick=()=>{G.selectedBiome=id;document.querySelectorAll('.biome-choice').forEach(x=>x.classList.remove('selected'));btn.classList.add('selected');};UI.startBiomes.appendChild(btn);}
-  }
-
-  function boot(){
-    InputSystem.bind();setupStartScreen();World.camera.zoom=1;UI.start.classList.remove('hidden');
-    window.addEventListener('beforeunload',()=>{if(G.running)SaveSystem.save(false);});
-    // Soft-start ambient render before the first game.
-    resizeCanvas();SP.clear(ctx,canvas.width,canvas.height,'#07100a');ctx.fillStyle='#afc7ae';ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText('BIOEVO • BRASIL NATIVO',canvas.width/2,canvas.height/2);
-  }
-
-  window.BioEvoGame={Game,World,Species,SaveSystem,Genetics,openEvolution,openLineage,openMap,openBuild};
-  boot();
+PopulationSystem.update=function(dt){
+  if(!Game.species)return;
+  const h=Game.species.genes;const habitat=BiomeSystem.habitat(h,Game.player.x,Game.player.y);const food=Game.species.inventory.frutas+(Game.species.inventory.carne||0)+(Game.species.inventory.peixe||0);
+  const birthRate=.0014*(1+(h.fertility||45)/90)*(food>20?1.2:.7);const mortality=.0009*(habitat<45?1.8:1)*(Game.species.population>8?1.1:.85);Game.species.population=Math.max(1,Math.round(Game.species.population+Game.species.population*(birthRate-mortality)*dt));Game.species.knowledge+=dt*(habitat/120);if(Game.species.population>=6&&Game.species.settlementLevel<1){Game.species.settlementLevel=1;Game.species.culture+=12;say('Sua espécie está formando grupos sociais.');}if(Game.species.population>=18&&Game.species.settlementLevel<2&&h.intelligence>35){Game.species.settlementLevel=2;Game.species.culture+=20;say('A linhagem alcançou organização tribal.');}if(Game.species.population>=60&&Game.species.technology>=3){Game.species.settlementLevel=3;say('Uma aldeia permanente começa a surgir.');}
+};
+BuildingSystem.canBuild=function(b){const inv=Game.species.inventory;return inv.madeira>=b.wood&&inv.pedra>=b.stone&&Game.species.technology>=b.tech;};
+BuildingSystem.build=function(id){const b=D.BUILDINGS[id];if(!b)return false;if(!this.canBuild(b)){say('Materiais ou tecnologia insuficientes.');return false;}Game.species.inventory.madeira-=b.wood;Game.species.inventory.pedra-=b.stone;Game.buildings.push({id:id,x:Math.floor(Game.player.x),y:Math.floor(Game.player.y),age:0,integrity:100});Game.species.culture+=4;Game.species.dna+=4;say('Construído: '+b.name);renderBuild();return true;};
+TechnologySystem.unlock=function(id){const t=D.TECHNOLOGIES[id];if(!t||Game.species.unlockedTech.includes(id))return false;if(Game.species.dna<t.cost){say('DNA insuficiente para estudar '+t.name+'.');return false;}Game.species.dna-=t.cost;Game.species.unlockedTech.push(id);Game.species.technology=Math.max(Game.species.technology,Game.species.unlockedTech.length);for(const[k,v]of Object.entries(t.effects)){if(k==='culture')Game.species.culture+=v;if(k==='build')Game.species.genes.build=(Game.species.genes.build||0)+v;if(k==='defense')Game.species.genes.defense+=v;if(k==='waterMax')Game.species.genes.waterMax+=v;if(k==='hpMax')Game.species.genes.hpMax+=v;}say('Tecnologia dominada: '+t.name);return true;};
+DiplomacySystem.update=function(dt){if(!Game.species)return;for(const id of D.BIOME_ORDER){if(id===Game.selectedBiome)continue;if(Game.species.relations[id]===undefined)Game.species.relations[id]=0;Game.species.relations[id]=clamp(Game.species.relations[id]+(rand()-.5)*dt*.2,-100,100);}};
+WeatherSystem.start=function(){Game.weather='clear';Game.weatherTimer=60;};
+WeatherSystem.tempOffset=function(){return (D.WEATHER[Game.weather]?.temp)||0;};
+WeatherSystem.update=function(dt){Game.weatherTimer-=dt;if(Game.weatherTimer>0)return;const b=BiomeSystem.at(Game.player?.x||0,Game.player?.y||0);const weights=b.weather.map(id=>({v:id,w:id==='clear'?2:1}));Game.weather=D.weightedPick(weights);Game.weatherTimer=D.WEATHER[Game.weather].duration;Game.weatherTicks++;if(Game.weather==='fire'){for(const p of Game.plants){if(Math.random()<.002)p.growth-=30;}}say('Clima: '+D.WEATHER[Game.weather].name);};
+TimeSystem.update=function(dt){Game.time+=dt;Game.hour=6+(Game.time/18)%24;const newDay=1+Math.floor(Game.time/300);if(newDay!==Game.day){Game.day=newDay;Game.species.dna+=5;Game.species.history.push('Dia '+Game.day+' concluído.');if(Game.day%4===0)PopulationSystem.update(14);}};
+RenderSystem.resize=function(){const r=canvas.getBoundingClientRect();canvas.width=Math.max(560,Math.floor(r.width*devicePixelRatio));canvas.height=Math.max(420,Math.floor(r.height*devicePixelRatio));ctx.imageSmoothingEnabled=false;};
+RenderSystem.worldToScreen=function(x,y){const scale=1.8;return{x:canvas.width/2+(x-Game.camera.x)*D.TILE*scale,y:canvas.height/2+(y-Game.camera.y)*D.TILE*scale};};
+RenderSystem.drawTile=function(x,y,b){const px=(x-Game.camera.x)*D.TILE*1.8+canvas.width/2,py=(y-Game.camera.y)*D.TILE*1.8+canvas.height/2;const s=D.TILE*1.8+1;const h=Game.world.height[key(x,y)]||.5;ctx.fillStyle=b.base;ctx.fillRect(px,py,s,s);if(h>.72){ctx.fillStyle='rgba(210,230,190,.06)';ctx.fillRect(px,py,s,s*.5);}if(Game.weather==='rain'||Game.weather==='storm'){ctx.fillStyle='rgba(80,150,180,.12)';ctx.fillRect(px,py,s,s);}if(Game.world.moisture[key(x,y)]>.94){ctx.fillStyle='rgba(65,140,180,.5)';ctx.fillRect(px+2,py+2,s-4,s-4);}};
+RenderSystem.drawWorld=function(){
+  const p=Game.player;if(!p)return;Game.camera.x+=(p.x-Game.camera.x)*.12;Game.camera.y+=(p.y-Game.camera.y)*.12;const z=1.8;const cols=Math.ceil(canvas.width/(D.TILE*z))+4,rows=Math.ceil(canvas.height/(D.TILE*z))+4;const sx=Math.floor(Game.camera.x-cols/2),sy=Math.floor(Game.camera.y-rows/2);ctx.fillStyle='#061009';ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let y=sy;y<sy+rows;y++){if(y<0||y>=D.WORLD_H)continue;for(let x=sx;x<sx+cols;x++){if(x<0||x>=D.WORLD_W)continue;this.drawTile(x,y,BiomeSystem.at(x+.1,y+.1));}}
+  for(const b of Game.buildings){if(Math.abs(b.x-p.x)<cols/2&&Math.abs(b.y-p.y)<rows/2){const s=this.worldToScreen(b.x+.5,b.y+.5);drawBuildingSprite(s.x,s.y,b.id);}}
+  for(const plant of Game.plants){if(plant.growth<8)continue;if(Math.abs(plant.x-p.x)>cols/2||Math.abs(plant.y-p.y)>rows/2)continue;const s=this.worldToScreen(plant.x,plant.y);const spec=D.PLANTS[plant.species];SP.drawPlant(ctx,s.x,s.y,D.TILE*.7,spec,Game.time*.05);}
+  for(const a of Game.animals){if(Math.abs(a.x-p.x)>cols/2||Math.abs(a.y-p.y)>rows/2)continue;const s=this.worldToScreen(a.x,a.y);SP.drawAnimal(ctx,s.x,s.y,D.TILE*.62,D.ANIMALS[a.species],{attack:a.state==='hunt'});}
+  const me=this.worldToScreen(p.x,p.y);SP.drawPlayer(ctx,me.x,me.y,D.TILE*.78,Game.species.genes,{facing:p.facing,shadow:true});
+  drawWeatherParticles();drawNightTint();drawFloating();
+};
+function drawBuildingSprite(x,y,id){ctx.save();ctx.imageSmoothingEnabled=false;const s=D.TILE*.9;const d={shelter:'#8b6948',campfire:'#d88a42',storage:'#9b744b',farm:'#6a9854',fence:'#876b4c',bridge:'#846747',workshop:'#79684e',tower:'#817258',house:'#8e7756',dock:'#657d89'}[id]||'#816';ctx.fillStyle=shadeColor(d,-22);ctx.fillRect(x-s*.35,y-s*.30,s*.7,s*.55);ctx.fillStyle=d;ctx.fillRect(x-s*.3,y-s*.22,s*.6,s*.42);if(id==='campfire')SP.pixelIcon(ctx,x,y-s*.05,15,'#f3b44f','fire');if(id==='farm'){ctx.fillStyle='#99b95d';for(let i=-2;i<=2;i++)ctx.fillRect(x+i*6,y+s*.12,3,7);}ctx.restore();}
+function shadeColor(c,d){return c.startsWith('#')?DARK(c,d):c;}function DARK(c,d){const n=parseInt(c.slice(1),16);const r=clamp((n>>16&255)+d,0,255),g=clamp((n>>8&255)+d,0,255),b=clamp((n&255)+d,0,255);return`rgb(${r},${g},${b})`;}
+function drawNightTint(){const h=Game.hour;let a=0;if(h<6)a=.34-Math.abs(h-3)*.08;else if(h<8)a=.20-(h-6)*.08;else if(h>18)a=Math.min(.38,(h-18)*.065);if(a>0){ctx.fillStyle=`rgba(5,12,24,${Math.max(0,a)})`;ctx.fillRect(0,0,canvas.width,canvas.height);}}
+function drawWeatherParticles(){if(Game.weather==='rain'||Game.weather==='storm'){ctx.save();ctx.strokeStyle='rgba(120,185,220,.34)';ctx.lineWidth=1;for(let i=0;i<70;i++){const x=(i*97+Game.time*180)%canvas.width,y=(i*53+Game.time*270)%canvas.height;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-3,y+11);ctx.stroke();}ctx.restore();}if(Game.weather==='fire'){ctx.save();for(let i=0;i<22;i++){const x=(i*77+Game.time*36)%canvas.width,y=(i*33-Game.time*25)%canvas.height;SP.pixelIcon(ctx,x,y,8,'#db8451','fire');}ctx.restore();}}
+function spawnFloat(text,x,y,kind){Game.floating.push({text,x,y,ttl:1.1,kind});if(Game.floating.length>28)Game.floating.shift();}
+function drawFloating(){for(let i=Game.floating.length-1;i>=0;i--){const f=Game.floating[i];f.ttl-=.016;const s=RenderSystem.worldToScreen(f.x,f.y);ctx.save();ctx.globalAlpha=Math.max(0,f.ttl);ctx.fillStyle=f.kind==='bad'?'#e07666':'#b9e58d';ctx.font='900 12px monospace';ctx.fillText(f.text,s.x+6,s.y-f.ttl*34);ctx.restore();if(f.ttl<=0)Game.floating.splice(i,1);}}
+UISystem.startScreen=function(){const wrap=$('start-biomes');wrap.innerHTML='';D.BIOME_ORDER.forEach((id,i)=>{const b=D.BIOMES[id];const el=document.createElement('button');el.className='biome-choice'+(id===Game.selectedBiome?' selected':'');el.innerHTML=`<span class="biome-icon">${b.icon}</span><strong>${b.name}</strong><small>${b.desc}</small>`;el.onclick=()=>{Game.selectedBiome=id;document.querySelectorAll('.biome-choice').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');};wrap.appendChild(el);});};
+UISystem.refresh=function(){if(!Game.species||!Game.player)return;const g=Game.species.genes,p=Game.player,b=BiomeSystem.at(p.x,p.y);UI.species.textContent=Game.species.name;UI.type.textContent=(g.body==='fish'?'AQUÁTICO':g.body==='bird'?'VOADOR':'TERRESTRE');UI.generation.textContent='Geração '+Game.species.generation;UI.dna.textContent=Math.floor(Game.species.dna);UI.biomass.textContent=Math.floor(Game.species.biomass);UI.stone.textContent=Game.species.inventory.pedra||0;UI.population.textContent=Game.species.population;UI.hp.textContent=Math.round(p.hp);UI.energy.textContent=Math.round(p.energy);UI.water.textContent=Math.round(p.water);UI.barHp.style.width=clamp(p.hp/g.hpMax*100,0,100)+'%';UI.barEnergy.style.width=clamp(p.energy/g.energyMax*100,0,100)+'%';UI.barWater.style.width=clamp(p.water/g.waterMax*100,0,100)+'%';UI.speed.textContent=Math.round(g.speed);UI.defense.textContent=Math.round(g.defense);UI.jump.textContent=Math.round(g.jump);UI.vision.textContent=Math.round(g.vision);const habitat=Math.round(BiomeSystem.habitat(g,p.x,p.y));UI.polish.innerHTML=`<div class="ph-chip">BIOMA <b>${b.icon} ${b.name}</b></div><div class="ph-chip">CLIMA <b>${D.WEATHER[Game.weather].name}</b></div><div class="ph-chip">DIA <b>${Game.day}</b></div><div class="ph-chip">HABITAT <b>${habitat}%</b></div>`;UI.dashboardSubtitle.textContent=`${Game.species.name} • ${b.name}`;RenderSystem.drawPortraits();};
+RenderSystem.drawPortraits=function(){if(!Game.species)return;pctx.clearRect(0,0,pcanvas.width,pcanvas.height);evoCtx.clearRect(0,0,evoCanvas.width,evoCanvas.height);pctx.fillStyle='#0a160e';pctx.fillRect(0,0,pcanvas.width,pcanvas.height);evoCtx.fillStyle='#0a160e';evoCtx.fillRect(0,0,evoCanvas.width,evoCanvas.height);SP.drawPlayer(pctx,80,72,56,Game.species.genes,{facing:1});SP.drawPlayer(evoCtx,130,110,92,Game.species.genes,{facing:1});UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const box=$('gene-summary');box.innerHTML=['speed','defense','vision','heat','cold','drought','fertility','intelligence'].map(k=>`<div class="gene-pill">${k}<b>${Math.round(Game.species.genes[k]||0)}</b></div>`).join('');};
+UISystem.renderEvolution=function(){const g=Game.species.genes;UI.evoOptions.innerHTML='';for(const m of D.MUTATIONS){const owned=Game.species.mutations.includes(m.id);const el=document.createElement('article');el.className='evo-option';const effect=Object.entries(m.effect).filter(([,v])=>typeof v==='number').map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(' • ');el.innerHTML=`<h3>${m.name}</h3><p>${m.desc}</p><p>${effect}</p><footer><span class="cost">🧬 ${m.cost} DNA</span><button class="small-btn" ${owned?'disabled':''}>${owned?'ADQUIRIDA':'ADAPTAR'}</button></footer>`;el.querySelector('button').onclick=()=>{if(EvolutionSystem.buy(m.id)){UISystem.renderEvolution();UISystem.refresh();}};UI.evoOptions.appendChild(el);}}
+UISystem.renderBuild=function(){UI.buildOptions.innerHTML='';for(const b of Object.values(D.BUILDINGS)){const el=document.createElement('article');el.className='build-option';el.innerHTML=`<h3>${b.name}</h3><p>${b.desc}</p><p>🌲 ${b.wood} • 🪨 ${b.stone} • tecnologia ${b.tech}</p><footer><span class="cost">Construção</span><button class="small-btn">ERGUR</button></footer>`;el.querySelector('button').onclick=()=>BuildingSystem.build(b.id);UI.buildOptions.appendChild(el);}}
+function renderBuild(){UISystem.renderBuild();}
+UISystem.dashboard=function(tab=Game.activeTab){Game.activeTab=tab;const s=Game.species;let html='';if(tab==='overview'){html=`<div class="dashboard-grid"><div class="dash-card"><span>Geração</span><strong>${s.generation}</strong></div><div class="dash-card"><span>População</span><strong>${s.population}</strong></div><div class="dash-card"><span>DNA</span><strong>${Math.floor(s.dna)}</strong></div><div class="dash-card"><span>Cultura</span><strong>${Math.floor(s.culture)}</strong></div></div><div class="dashboard-section" style="margin-top:12px"><h3>História recente</h3><div class="event-log">${s.history.slice(-12).reverse().map(x=>`<div>${x}</div>`).join('')}</div></div>`;}else if(tab==='ecology'){const b=BiomeSystem.at(Game.player.x,Game.player.y);html=`<div class="dashboard-grid"><div class="dash-card"><span>Bioma</span><strong>${b.icon}</strong><span>${b.name}</span></div><div class="dash-card"><span>Umidade</span><strong>${b.humidity}%</strong></div><div class="dash-card"><span>Água</span><strong>${b.water}%</strong></div><div class="dash-card"><span>Clima</span><strong>${D.WEATHER[Game.weather].name}</strong></div></div><div class="dashboard-section" style="margin-top:12px"><h3>Relação animal • vegetal</h3><p style="color:var(--muted);font-size:10px;line-height:1.6">Plantas crescem conforme umidade, fertilidade e clima. Herbívoros consomem crescimento vegetal; predadores perseguem presas e a disponibilidade de alimento altera a população. O fogo e a enchente não são apenas dano: reorganizam recursos e território.</p></div>`;}else if(tab==='lineage'){html=`<div class="dashboard-section"><h3>Gerações registradas</h3>${Game.lineage.map((n,i)=>`<div class="lineage-node"><b>G${n.generation||i+1}</b><span>${n.name}</span><small>${n.note||'Descendente'}</small></div>`).join('')}</div>`;}else if(tab==='culture'){html=`<div class="dashboard-grid"><div class="dash-card"><span>Cultura</span><strong>${Math.floor(s.culture)}</strong></div><div class="dash-card"><span>Sociedade</span><strong>${s.settlementLevel<2?'Grupo':s.settlementLevel===2?'Tribo':s.settlementLevel===3?'Aldeia':'Civilização'}</strong></div><div class="dash-card"><span>Conhecimento</span><strong>${Math.floor(s.knowledge)}</strong></div><div class="dash-card"><span>Tecnologia</span><strong>${Math.floor(s.technology)}</strong></div></div><div class="chip-list" style="margin-top:12px">${['Tradições','Símbolos','Arquitetura','Arte','Música','Costumes'].map(x=>`<span class="chip">${x}</span>`).join('')}</div>`;}else if(tab==='technology'){html='<div class="tech-grid">'+Object.values(D.TECHNOLOGIES).map(t=>{const owned=s.unlockedTech.includes(t.id);return `<article class="tech-card"><strong>${t.name}</strong><p>${t.desc}</p><span class="cost">🧬 ${t.cost} DNA</span><button class="small-btn" data-tech="${t.id}" ${owned?'disabled':''}>${owned?'DOMINADA':'ESTUDAR'}</button></article>`;}).join('')+'</div>';}else{html='<div class="codex-grid dashboard-section">'+D.CODEX.slice(0,80).map(r=>`<article class="codex-record"><div class="codex-index">${r.id.slice(-4)}</div><div class="codex-copy"><h3>${r.title}</h3><p>${r.note}</p></div><div class="codex-seal">BIO</div></article>`).join('')+'</div>';}
+  UI.dashboardBody.innerHTML=html;document.querySelectorAll('[data-tech]').forEach(b=>b.onclick=()=>{if(TechnologySystem.unlock(b.dataset.tech))UISystem.dashboard('technology');UISystem.refresh();});document.querySelectorAll('.dashboard-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));};
+UISystem.map=function(){const w=mapCanvas.width,h=mapCanvas.height;mapCtx.fillStyle='#07110b';mapCtx.fillRect(0,0,w,h);const cw=w/D.WORLD_W,ch=h/D.WORLD_H;for(let y=0;y<D.WORLD_H;y++){for(let x=0;x<D.WORLD_W;x++){const b=D.BIOMES[D.BIOME_ORDER[tile(x,y)]];mapCtx.fillStyle=b.base;mapCtx.fillRect(x*cw,y*ch,Math.ceil(cw)+1,Math.ceil(ch)+1);}}if(Game.player){mapCtx.fillStyle='#fff';mapCtx.beginPath();mapCtx.arc(Game.player.x*cw,Game.player.y*ch,4,0,Math.PI*2);mapCtx.fill();}UI.mapLegend.innerHTML=D.BIOME_ORDER.map(id=>`<span class="legend-pill">${D.BIOMES[id].icon} ${D.BIOMES[id].name}</span>`).join('');setModal(UI.map,true);};
+UISystem.lineage=function(){lineageCtx.fillStyle='#07110b';lineageCtx.fillRect(0,0,lineageCanvas.width,lineageCanvas.height);const nodes=Game.lineage.slice(-22);nodes.forEach((n,i)=>{const x=40+(i%7)*125,y=55+Math.floor(i/7)*130;lineageCtx.fillStyle='#14271a';lineageCtx.fillRect(x,y,104,58);lineageCtx.strokeStyle='#3a6540';lineageCtx.strokeRect(x,y,104,58);lineageCtx.fillStyle='#e8f1e3';lineageCtx.font='900 11px monospace';lineageCtx.fillText('G'+n.generation,x+10,y+18);lineageCtx.fillStyle='#8fa58f';lineageCtx.font='9px monospace';lineageCtx.fillText(String(n.name).slice(0,15),x+10,y+35);if(i>0){lineageCtx.strokeStyle='#547657';lineageCtx.beginPath();lineageCtx.moveTo(x-22,y+28);lineageCtx.lineTo(x,y+28);lineageCtx.stroke();}});UI.lineageTree.innerHTML=nodes.slice().reverse().map(n=>`<div class="lineage-node"><b>G${n.generation}</b><span>${n.name}</span><small>${n.note||'Descendente registrado'}</small></div>`).join('');setModal(UI.lineage,true);};
+SaveSystem.serialize=function(){const safe={version:D.VERSION,seed:Game.seed,selectedBiome:Game.selectedBiome,species:Game.species,player:{x:Game.player.x,y:Game.player.y,hp:Game.player.hp,energy:Game.player.energy,water:Game.player.water,alive:Game.player.alive},weather:Game.weather,weatherTimer:Game.weatherTimer,day:Game.day,hour:Game.hour,discoveries:[...Game.discoveries],buildings:Game.buildings.slice(0,160),lineage:Game.lineage.slice(-120)};return JSON.stringify(safe);};
+SaveSystem.save=function(){try{localStorage.setItem('bioevo_save_final',this.serialize());say('Jogo salvo localmente.');}catch(e){say('Não foi possível salvar: '+e.message);}};
+SaveSystem.load=function(){try{const raw=localStorage.getItem('bioevo_save_final');if(!raw)return false;const s=JSON.parse(raw);if(!s||!s.species||!s.player)return false;Game.seed=s.seed||Game.seed;Game.selectedBiome=s.selectedBiome||'cerrado';Game.species=s.species;Game.player=Object.assign(Game.player||{},s.player,{alive:s.player.alive!==false});Game.weather=s.weather||'clear';Game.weatherTimer=s.weatherTimer||50;Game.day=s.day||1;Game.hour=s.hour||6;Game.discoveries=new Set(s.discoveries||[Game.selectedBiome]);Game.buildings=s.buildings||[];Game.lineage=s.lineage||[];return true;}catch(e){console.warn(e);return false;}};
+UISystem.bind=function(){
+  window.addEventListener('resize',RenderSystem.resize);RenderSystem.resize();
+  window.addEventListener('keydown',e=>{Game.keys[e.key]=true;const k=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(k==='q'){UISystem.renderEvolution();setModal(UI.evo,true);}if(k==='b'){UISystem.renderBuild();setModal(UI.build,true);}if(k==='l')UISystem.lineage();if(k==='m')UISystem.map();if(k==='e')PlayerSystem.eat();if(k==='r')ReproductionSystem.tryBreed();if(k==='f')PlayerSystem.attack();if(k==='escape'){[UI.evo,UI.build,UI.lineage,UI.map].forEach(x=>setModal(x,false));UI.dashboard.classList.add('hidden');}if(k===' '){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}});window.addEventListener('keyup',e=>{Game.keys[e.key]=false;});
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>setModal($(b.dataset.close),false));document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>Actions.run(b.dataset.action));document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{Game.activeTab=b.dataset.tab;UISystem.dashboard(Game.activeTab);});$('btn-start').onclick=Actions.start;
+};
+const Actions={run(action){if(action==='pause'){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}if(action==='evolution'){UISystem.renderEvolution();setModal(UI.evo,true);}if(action==='dashboard'){Game.activeTab='overview';UI.dashboard.classList.remove('hidden');UISystem.dashboard('overview');}if(action==='dashboard-close'){UI.dashboard.classList.add('hidden');}if(action==='save'){SaveSystem.save();}},start(){const name=$('input-species').value.trim()||'Carijó';EvolutionSystem.newSpecies(name,Game.selectedBiome);WorldSystem.init();WeatherSystem.start();Game.running=true;UI.start.classList.add('hidden');UI.loading.classList.add('hidden');UISystem.refresh();say('A linhagem '+name+' nasceu em '+D.BIOMES[Game.selectedBiome].name+'.');}};
+UISystem.startScreen();UISystem.bind();
+function step(dt){if(!Game.running||Game.paused||!Game.player)return;TimeSystem.update(dt);WeatherSystem.update(dt);PlayerSystem.update(dt);PlantSystem.update(dt);AnimalAISystem.update(dt);PopulationSystem.update(dt*.2);DiplomacySystem.update(dt);Game.autosaveTimer+=dt;if(Game.autosaveTimer>30){Game.autosaveTimer=0;SaveSystem.save();}UISystem.refresh();}
+function loop(now){const dt=Math.min(.05,(now-Game.last)/1000);Game.last=now;step(dt);RenderSystem.drawWorld();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
 })();
-
-/* --- Extra systems and helpers kept in this file for a self-contained GitHub Pages build. --- */
-/* The following utility library is intentionally dependency-free and used by future save-compatible systems. */
-(function(){
-  window.BioUtility={
-    average(list,key){if(!list.length)return 0;let s=0;for(const x of list)s+=Number(x[key]||0);return s/list.length;},
-    percentile(list,p){if(!list.length)return 0;const a=list.map(Number).sort((x,y)=>x-y);const i=(a.length-1)*p;const lo=Math.floor(i),hi=Math.ceil(i);return lo===hi?a[lo]:a[lo]+(a[hi]-a[lo])*(i-lo);},
-    weighted(items,weights){let total=weights.reduce((a,b)=>a+b,0);let r=Math.random()*total;for(let i=0;i<items.length;i++){r-=weights[i];if(r<=0)return items[i];}return items[items.length-1];},
-    gridKey(x,y){return `${x|0}:${y|0}`;},
-    seededNoise(x,y,s){let n=Math.sin(x*157.31+y*113.71+s*17.17)*43758.5453;return n-Math.floor(n);},
-    clamp(v,a,b){return Math.max(a,Math.min(b,v));},
-    dist(ax,ay,bx,by){return Math.hypot(ax-bx,ay-by);},
-    angle(ax,ay,bx,by){return Math.atan2(by-ay,bx-ax);},
-    normalize(x,y){const d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};},
-    formatNumber(n){return Intl.NumberFormat('pt-BR',{maximumFractionDigits:0}).format(n);},
-    deepClone(v){return JSON.parse(JSON.stringify(v));}
-  };
-})();
-
-/* Save schema migration hooks. Keeping them explicit makes later versions safer. */
-(function(){
-  const migrations={
-    '0.8.0':d=>d,
-    '0.9.0':d=>d
-  };
-  window.BioSaveMigrations={
-    migrate(data){if(!data)return data;const v=data.version||'0.8.0';return migrations[v]?migrations[v](data):data;}
-  };
-})();
-
-/* Simple color utilities for sprite evolution. */
-(function(){
-  window.BioColor={
-    hexToRgb(hex){const m=String(hex).match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);if(!m)return{r:100,g:150,b:100};return{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16)};},
-    rgbToHex(r,g,b){return'#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');},
-    mix(a,b,t){const A=this.hexToRgb(a),B=this.hexToRgb(b);return this.rgbToHex(A.r+(B.r-A.r)*t,A.g+(B.g-A.g)*t,A.b+(B.b-A.b)*t);},
-    shade(a,t=-.2){const c=this.hexToRgb(a);return this.rgbToHex(c.r*(1+t),c.g*(1+t),c.b*(1+t));}
-  };
-})();
-
-/* Balancing table reserved for deterministic tuning without touching the simulation flow. */
-(function(){
-  window.BioBalance={
-    player:{energyDrain:.45,waterDrain:.045,attackCooldown:.45,foodCooldown:.65},
-    population:{maxLocalAnimals:180,hardLocalAnimals:250,baseCarrying:40},
-    performance:{maxParticles:45,maxPlants:1050,maxBuildings:100,maxLogs:30},
-    genetics:{mutationChance:.075,rareMutationChance:.012},
-    progression:{dnaDay:3,dnaDiscovery:20,dnaFood:2,dnaReproduction:40}
-  };
-})();
-
-/* Accessibility: keyboard focus and reduced motion friendly hooks. */
-(function(){
-  document.addEventListener('focusin',e=>{if(e.target.matches('button,input'))e.target.setAttribute('data-focused','1');});
-  document.addEventListener('focusout',e=>{if(e.target.matches('button,input'))e.target.removeAttribute('data-focused');});
-})();
-
-/* Debug bridge is intentionally inert unless a developer opens the console. */
-(function(){
-  window.BioDebug={
-    state(){return window.BioEvoGame?{species:window.BioEvoGame.Species,player:window.BioEvoGame.World.player,animals:window.BioEvoGame.World.animals.length,plants:window.BioEvoGame.World.plants.length}:null;},
-    addDNA(n){if(window.BioEvoGame){window.BioEvoGame.Species.dna+=Number(n)||0;}},
-    reveal(){if(window.BioEvoGame){window.BioEvoGame.World.biomeDiscovery=new Set(BioData.BIOME_ORDER);}},
-    heal(){if(window.BioEvoGame){const p=window.BioEvoGame.World.player;if(p){p.hp=window.BioEvoGame.Species.genes.hpMax;p.energy=window.BioEvoGame.Species.genes.energyMax;p.water=window.BioEvoGame.Species.genes.waterMax;}}}
-  };
-})();
-
-/* Deterministic easing helpers used by future animation channels. */
-(function(){
-  window.BioEase={
-    linear:t=>t,
-    smooth:t=>t*t*(3-2*t),
-    smoother:t=>t*t*t*(t*(t*6-15)+10),
-    outQuad:t=>1-(1-t)*(1-t),
-    inQuad:t=>t*t,
-    pulse:t=>.5+.5*Math.sin(t*Math.PI*2),
-    spring:t=>1-Math.exp(-6*t)*Math.cos(9*t)
-  };
-})();
-
-/* ========================================================================== */
-/* CONTENT PACK: ambient ecology, milestones and lightweight tuning metadata */
-/* This data is read on demand; it does not spawn entities or cost frame time. */
-/* ========================================================================== */
-(function(){
-  const events = window.BioAmbientEvents = [];
-  events.push({id:'amb_000',biome:'amazonas',kind:'rastros',text:'Sinal ecológico 000 observado em amazonas: rastros.',dna:2});
-  events.push({id:'amb_001',biome:'caatinga',kind:'florescimento',text:'Sinal ecológico 001 observado em caatinga: florescimento.',dna:3});
-  events.push({id:'amb_002',biome:'cerrado',kind:'migração',text:'Sinal ecológico 002 observado em cerrado: migração.',dna:4});
-  events.push({id:'amb_003',biome:'mata',kind:'ninhos',text:'Sinal ecológico 003 observado em mata: ninhos.',dna:5});
-  events.push({id:'amb_004',biome:'pantanal',kind:'sementes',text:'Sinal ecológico 004 observado em pantanal: sementes.',dna:6});
-  events.push({id:'amb_005',biome:'pampa',kind:'cantos',text:'Sinal ecológico 005 observado em pampa: cantos.',dna:7});
-  events.push({id:'amb_006',biome:'amazonas',kind:'pegadas',text:'Sinal ecológico 006 observado em amazonas: pegadas.',dna:8});
-  events.push({id:'amb_007',biome:'caatinga',kind:'chuva',text:'Sinal ecológico 007 observado em caatinga: chuva.',dna:2});
-  events.push({id:'amb_008',biome:'cerrado',kind:'silêncio',text:'Sinal ecológico 008 observado em cerrado: silêncio.',dna:3});
-  events.push({id:'amb_009',biome:'mata',kind:'disputa',text:'Sinal ecológico 009 observado em mata: disputa.',dna:4});
-  events.push({id:'amb_010',biome:'pantanal',kind:'rastros',text:'Sinal ecológico 010 observado em pantanal: rastros.',dna:5});
-  events.push({id:'amb_011',biome:'pampa',kind:'florescimento',text:'Sinal ecológico 011 observado em pampa: florescimento.',dna:6});
-  events.push({id:'amb_012',biome:'amazonas',kind:'migração',text:'Sinal ecológico 012 observado em amazonas: migração.',dna:7});
-  events.push({id:'amb_013',biome:'caatinga',kind:'ninhos',text:'Sinal ecológico 013 observado em caatinga: ninhos.',dna:8});
-  events.push({id:'amb_014',biome:'cerrado',kind:'sementes',text:'Sinal ecológico 014 observado em cerrado: sementes.',dna:2});
-  events.push({id:'amb_015',biome:'mata',kind:'cantos',text:'Sinal ecológico 015 observado em mata: cantos.',dna:3});
-  events.push({id:'amb_016',biome:'pantanal',kind:'pegadas',text:'Sinal ecológico 016 observado em pantanal: pegadas.',dna:4});
-  events.push({id:'amb_017',biome:'pampa',kind:'chuva',text:'Sinal ecológico 017 observado em pampa: chuva.',dna:5});
-  events.push({id:'amb_018',biome:'amazonas',kind:'silêncio',text:'Sinal ecológico 018 observado em amazonas: silêncio.',dna:6});
-  events.push({id:'amb_019',biome:'caatinga',kind:'disputa',text:'Sinal ecológico 019 observado em caatinga: disputa.',dna:7});
-  events.push({id:'amb_020',biome:'cerrado',kind:'rastros',text:'Sinal ecológico 020 observado em cerrado: rastros.',dna:8});
-  events.push({id:'amb_021',biome:'mata',kind:'florescimento',text:'Sinal ecológico 021 observado em mata: florescimento.',dna:2});
-  events.push({id:'amb_022',biome:'pantanal',kind:'migração',text:'Sinal ecológico 022 observado em pantanal: migração.',dna:3});
-  events.push({id:'amb_023',biome:'pampa',kind:'ninhos',text:'Sinal ecológico 023 observado em pampa: ninhos.',dna:4});
-  events.push({id:'amb_024',biome:'amazonas',kind:'sementes',text:'Sinal ecológico 024 observado em amazonas: sementes.',dna:5});
-  events.push({id:'amb_025',biome:'caatinga',kind:'cantos',text:'Sinal ecológico 025 observado em caatinga: cantos.',dna:6});
-  events.push({id:'amb_026',biome:'cerrado',kind:'pegadas',text:'Sinal ecológico 026 observado em cerrado: pegadas.',dna:7});
-  events.push({id:'amb_027',biome:'mata',kind:'chuva',text:'Sinal ecológico 027 observado em mata: chuva.',dna:8});
-  events.push({id:'amb_028',biome:'pantanal',kind:'silêncio',text:'Sinal ecológico 028 observado em pantanal: silêncio.',dna:2});
-  events.push({id:'amb_029',biome:'pampa',kind:'disputa',text:'Sinal ecológico 029 observado em pampa: disputa.',dna:3});
-  events.push({id:'amb_030',biome:'amazonas',kind:'rastros',text:'Sinal ecológico 030 observado em amazonas: rastros.',dna:4});
-  events.push({id:'amb_031',biome:'caatinga',kind:'florescimento',text:'Sinal ecológico 031 observado em caatinga: florescimento.',dna:5});
-  events.push({id:'amb_032',biome:'cerrado',kind:'migração',text:'Sinal ecológico 032 observado em cerrado: migração.',dna:6});
-  events.push({id:'amb_033',biome:'mata',kind:'ninhos',text:'Sinal ecológico 033 observado em mata: ninhos.',dna:7});
-  events.push({id:'amb_034',biome:'pantanal',kind:'sementes',text:'Sinal ecológico 034 observado em pantanal: sementes.',dna:8});
-  events.push({id:'amb_035',biome:'pampa',kind:'cantos',text:'Sinal ecológico 035 observado em pampa: cantos.',dna:2});
-  events.push({id:'amb_036',biome:'amazonas',kind:'pegadas',text:'Sinal ecológico 036 observado em amazonas: pegadas.',dna:3});
-  events.push({id:'amb_037',biome:'caatinga',kind:'chuva',text:'Sinal ecológico 037 observado em caatinga: chuva.',dna:4});
-  events.push({id:'amb_038',biome:'cerrado',kind:'silêncio',text:'Sinal ecológico 038 observado em cerrado: silêncio.',dna:5});
-  events.push({id:'amb_039',biome:'mata',kind:'disputa',text:'Sinal ecológico 039 observado em mata: disputa.',dna:6});
-  events.push({id:'amb_040',biome:'pantanal',kind:'rastros',text:'Sinal ecológico 040 observado em pantanal: rastros.',dna:7});
-  events.push({id:'amb_041',biome:'pampa',kind:'florescimento',text:'Sinal ecológico 041 observado em pampa: florescimento.',dna:8});
-  events.push({id:'amb_042',biome:'amazonas',kind:'migração',text:'Sinal ecológico 042 observado em amazonas: migração.',dna:2});
-  events.push({id:'amb_043',biome:'caatinga',kind:'ninhos',text:'Sinal ecológico 043 observado em caatinga: ninhos.',dna:3});
-  events.push({id:'amb_044',biome:'cerrado',kind:'sementes',text:'Sinal ecológico 044 observado em cerrado: sementes.',dna:4});
-  events.push({id:'amb_045',biome:'mata',kind:'cantos',text:'Sinal ecológico 045 observado em mata: cantos.',dna:5});
-  events.push({id:'amb_046',biome:'pantanal',kind:'pegadas',text:'Sinal ecológico 046 observado em pantanal: pegadas.',dna:6});
-  events.push({id:'amb_047',biome:'pampa',kind:'chuva',text:'Sinal ecológico 047 observado em pampa: chuva.',dna:7});
-  events.push({id:'amb_048',biome:'amazonas',kind:'silêncio',text:'Sinal ecológico 048 observado em amazonas: silêncio.',dna:8});
-  events.push({id:'amb_049',biome:'caatinga',kind:'disputa',text:'Sinal ecológico 049 observado em caatinga: disputa.',dna:2});
-  events.push({id:'amb_050',biome:'cerrado',kind:'rastros',text:'Sinal ecológico 050 observado em cerrado: rastros.',dna:3});
-  events.push({id:'amb_051',biome:'mata',kind:'florescimento',text:'Sinal ecológico 051 observado em mata: florescimento.',dna:4});
-  events.push({id:'amb_052',biome:'pantanal',kind:'migração',text:'Sinal ecológico 052 observado em pantanal: migração.',dna:5});
-  events.push({id:'amb_053',biome:'pampa',kind:'ninhos',text:'Sinal ecológico 053 observado em pampa: ninhos.',dna:6});
-  events.push({id:'amb_054',biome:'amazonas',kind:'sementes',text:'Sinal ecológico 054 observado em amazonas: sementes.',dna:7});
-  events.push({id:'amb_055',biome:'caatinga',kind:'cantos',text:'Sinal ecológico 055 observado em caatinga: cantos.',dna:8});
-  events.push({id:'amb_056',biome:'cerrado',kind:'pegadas',text:'Sinal ecológico 056 observado em cerrado: pegadas.',dna:2});
-  events.push({id:'amb_057',biome:'mata',kind:'chuva',text:'Sinal ecológico 057 observado em mata: chuva.',dna:3});
-  events.push({id:'amb_058',biome:'pantanal',kind:'silêncio',text:'Sinal ecológico 058 observado em pantanal: silêncio.',dna:4});
-  events.push({id:'amb_059',biome:'pampa',kind:'disputa',text:'Sinal ecológico 059 observado em pampa: disputa.',dna:5});
-  events.push({id:'amb_060',biome:'amazonas',kind:'rastros',text:'Sinal ecológico 060 observado em amazonas: rastros.',dna:6});
-  events.push({id:'amb_061',biome:'caatinga',kind:'florescimento',text:'Sinal ecológico 061 observado em caatinga: florescimento.',dna:7});
-  events.push({id:'amb_062',biome:'cerrado',kind:'migração',text:'Sinal ecológico 062 observado em cerrado: migração.',dna:8});
-  events.push({id:'amb_063',biome:'mata',kind:'ninhos',text:'Sinal ecológico 063 observado em mata: ninhos.',dna:2});
-  events.push({id:'amb_064',biome:'pantanal',kind:'sementes',text:'Sinal ecológico 064 observado em pantanal: sementes.',dna:3});
-  events.push({id:'amb_065',biome:'pampa',kind:'cantos',text:'Sinal ecológico 065 observado em pampa: cantos.',dna:4});
-  events.push({id:'amb_066',biome:'amazonas',kind:'pegadas',text:'Sinal ecológico 066 observado em amazonas: pegadas.',dna:5});
-  events.push({id:'amb_067',biome:'caatinga',kind:'chuva',text:'Sinal ecológico 067 observado em caatinga: chuva.',dna:6});
-  events.push({id:'amb_068',biome:'cerrado',kind:'silêncio',text:'Sinal ecológico 068 observado em cerrado: silêncio.',dna:7});
-  events.push({id:'amb_069',biome:'mata',kind:'disputa',text:'Sinal ecológico 069 observado em mata: disputa.',dna:8});
-  events.push({id:'amb_070',biome:'pantanal',kind:'rastros',text:'Sinal ecológico 070 observado em pantanal: rastros.',dna:2});
-  events.push({id:'amb_071',biome:'pampa',kind:'florescimento',text:'Sinal ecológico 071 observado em pampa: florescimento.',dna:3});
-  events.push({id:'amb_072',biome:'amazonas',kind:'migração',text:'Sinal ecológico 072 observado em amazonas: migração.',dna:4});
-  events.push({id:'amb_073',biome:'caatinga',kind:'ninhos',text:'Sinal ecológico 073 observado em caatinga: ninhos.',dna:5});
-  events.push({id:'amb_074',biome:'cerrado',kind:'sementes',text:'Sinal ecológico 074 observado em cerrado: sementes.',dna:6});
-  events.push({id:'amb_075',biome:'mata',kind:'cantos',text:'Sinal ecológico 075 observado em mata: cantos.',dna:7});
-  events.push({id:'amb_076',biome:'pantanal',kind:'pegadas',text:'Sinal ecológico 076 observado em pantanal: pegadas.',dna:8});
-  events.push({id:'amb_077',biome:'pampa',kind:'chuva',text:'Sinal ecológico 077 observado em pampa: chuva.',dna:2});
-  events.push({id:'amb_078',biome:'amazonas',kind:'silêncio',text:'Sinal ecológico 078 observado em amazonas: silêncio.',dna:3});
-  events.push({id:'amb_079',biome:'caatinga',kind:'disputa',text:'Sinal ecológico 079 observado em caatinga: disputa.',dna:4});
-  events.push({id:'amb_080',biome:'cerrado',kind:'rastros',text:'Sinal ecológico 080 observado em cerrado: rastros.',dna:5});
-  events.push({id:'amb_081',biome:'mata',kind:'florescimento',text:'Sinal ecológico 081 observado em mata: florescimento.',dna:6});
-  events.push({id:'amb_082',biome:'pantanal',kind:'migração',text:'Sinal ecológico 082 observado em pantanal: migração.',dna:7});
-  events.push({id:'amb_083',biome:'pampa',kind:'ninhos',text:'Sinal ecológico 083 observado em pampa: ninhos.',dna:8});
-  events.push({id:'amb_084',biome:'amazonas',kind:'sementes',text:'Sinal ecológico 084 observado em amazonas: sementes.',dna:2});
-  events.push({id:'amb_085',biome:'caatinga',kind:'cantos',text:'Sinal ecológico 085 observado em caatinga: cantos.',dna:3});
-  events.push({id:'amb_086',biome:'cerrado',kind:'pegadas',text:'Sinal ecológico 086 observado em cerrado: pegadas.',dna:4});
-  events.push({id:'amb_087',biome:'mata',kind:'chuva',text:'Sinal ecológico 087 observado em mata: chuva.',dna:5});
-  events.push({id:'amb_088',biome:'pantanal',kind:'silêncio',text:'Sinal ecológico 088 observado em pantanal: silêncio.',dna:6});
-  events.push({id:'amb_089',biome:'pampa',kind:'disputa',text:'Sinal ecológico 089 observado em pampa: disputa.',dna:7});
-  events.push({id:'amb_090',biome:'amazonas',kind:'rastros',text:'Sinal ecológico 090 observado em amazonas: rastros.',dna:8});
-  events.push({id:'amb_091',biome:'caatinga',kind:'florescimento',text:'Sinal ecológico 091 observado em caatinga: florescimento.',dna:2});
-  events.push({id:'amb_092',biome:'cerrado',kind:'migração',text:'Sinal ecológico 092 observado em cerrado: migração.',dna:3});
-  events.push({id:'amb_093',biome:'mata',kind:'ninhos',text:'Sinal ecológico 093 observado em mata: ninhos.',dna:4});
-  events.push({id:'amb_094',biome:'pantanal',kind:'sementes',text:'Sinal ecológico 094 observado em pantanal: sementes.',dna:5});
-  events.push({id:'amb_095',biome:'pampa',kind:'cantos',text:'Sinal ecológico 095 observado em pampa: cantos.',dna:6});
-  events.push({id:'amb_096',biome:'amazonas',kind:'pegadas',text:'Sinal ecológico 096 observado em amazonas: pegadas.',dna:7});
-  events.push({id:'amb_097',biome:'caatinga',kind:'chuva',text:'Sinal ecológico 097 observado em caatinga: chuva.',dna:8});
-  events.push({id:'amb_098',biome:'cerrado',kind:'silêncio',text:'Sinal ecológico 098 observado em cerrado: silêncio.',dna:2});
-  events.push({id:'amb_099',biome:'mata',kind:'disputa',text:'Sinal ecológico 099 observado em mata: disputa.',dna:3});
-  events.push({id:'amb_100',biome:'pantanal',kind:'rastros',text:'Sinal ecológico 100 observado em pantanal: rastros.',dna:4});
-  events.push({id:'amb_101',biome:'pampa',kind:'florescimento',text:'Sinal ecológico 101 observado em pampa: florescimento.',dna:5});
-  events.push({id:'amb_102',biome:'amazonas',kind:'migração',text:'Sinal ecológico 102 observado em amazonas: migração.',dna:6});
-  events.push({id:'amb_103',biome:'caatinga',kind:'ninhos',text:'Sinal ecológico 103 observado em caatinga: ninhos.',dna:7});
-  events.push({id:'amb_104',biome:'cerrado',kind:'sementes',text:'Sinal ecológico 104 observado em cerrado: sementes.',dna:8});
-  events.push({id:'amb_105',biome:'mata',kind:'cantos',text:'Sinal ecológico 105 observado em mata: cantos.',dna:2});
-  events.push({id:'amb_106',biome:'pantanal',kind:'pegadas',text:'Sinal ecológico 106 observado em pantanal: pegadas.',dna:3});
-  events.push({id:'amb_107',biome:'pampa',kind:'chuva',text:'Sinal ecológico 107 observado em pampa: chuva.',dna:4});
-  events.push({id:'amb_108',biome:'amazonas',kind:'silêncio',text:'Sinal ecológico 108 observado em amazonas: silêncio.',dna:5});
-  events.push({id:'amb_109',biome:'caatinga',kind:'disputa',text:'Sinal ecológico 109 observado em caatinga: disputa.',dna:6});
-  events.push({id:'amb_110',biome:'cerrado',kind:'rastros',text:'Sinal ecológico 110 observado em cerrado: rastros.',dna:7});
-  events.push({id:'amb_111',biome:'mata',kind:'florescimento',text:'Sinal ecológico 111 observado em mata: florescimento.',dna:8});
-  events.push({id:'amb_112',biome:'pantanal',kind:'migração',text:'Sinal ecológico 112 observado em pantanal: migração.',dna:2});
-  events.push({id:'amb_113',biome:'pampa',kind:'ninhos',text:'Sinal ecológico 113 observado em pampa: ninhos.',dna:3});
-  events.push({id:'amb_114',biome:'amazonas',kind:'sementes',text:'Sinal ecológico 114 observado em amazonas: sementes.',dna:4});
-  events.push({id:'amb_115',biome:'caatinga',kind:'cantos',text:'Sinal ecológico 115 observado em caatinga: cantos.',dna:5});
-  events.push({id:'amb_116',biome:'cerrado',kind:'pegadas',text:'Sinal ecológico 116 observado em cerrado: pegadas.',dna:6});
-  events.push({id:'amb_117',biome:'mata',kind:'chuva',text:'Sinal ecológico 117 observado em mata: chuva.',dna:7});
-  events.push({id:'amb_118',biome:'pantanal',kind:'silêncio',text:'Sinal ecológico 118 observado em pantanal: silêncio.',dna:8});
-  events.push({id:'amb_119',biome:'pampa',kind:'disputa',text:'Sinal ecológico 119 observado em pampa: disputa.',dna:2});
-  events.push({id:'amb_120',biome:'amazonas',kind:'rastros',text:'Sinal ecológico 120 observado em amazonas: rastros.',dna:3});
-  events.push({id:'amb_121',biome:'caatinga',kind:'florescimento',text:'Sinal ecológico 121 observado em caatinga: florescimento.',dna:4});
-  events.push({id:'amb_122',biome:'cerrado',kind:'migração',text:'Sinal ecológico 122 observado em cerrado: migração.',dna:5});
-  events.push({id:'amb_123',biome:'mata',kind:'ninhos',text:'Sinal ecológico 123 observado em mata: ninhos.',dna:6});
-  events.push({id:'amb_124',biome:'pantanal',kind:'sementes',text:'Sinal ecológico 124 observado em pantanal: sementes.',dna:7});
-  events.push({id:'amb_125',biome:'pampa',kind:'cantos',text:'Sinal ecológico 125 observado em pampa: cantos.',dna:8});
-  events.push({id:'amb_126',biome:'amazonas',kind:'pegadas',text:'Sinal ecológico 126 observado em amazonas: pegadas.',dna:2});
-  events.push({id:'amb_127',biome:'caatinga',kind:'chuva',text:'Sinal ecológico 127 observado em caatinga: chuva.',dna:3});
-  events.push({id:'amb_128',biome:'cerrado',kind:'silêncio',text:'Sinal ecológico 128 observado em cerrado: silêncio.',dna:4});
-  events.push({id:'amb_129',biome:'mata',kind:'disputa',text:'Sinal ecológico 129 observado em mata: disputa.',dna:5});
-  events.push({id:'amb_130',biome:'pantanal',kind:'rastros',text:'Sinal ecológico 130 observado em pantanal: rastros.',dna:6});
-  events.push({id:'amb_131',biome:'pampa',kind:'florescimento',text:'Sinal ecológico 131 observado em pampa: florescimento.',dna:7});
-  events.push({id:'amb_132',biome:'amazonas',kind:'migração',text:'Sinal ecológico 132 observado em amazonas: migração.',dna:8});
-  events.push({id:'amb_133',biome:'caatinga',kind:'ninhos',text:'Sinal ecológico 133 observado em caatinga: ninhos.',dna:2});
-  events.push({id:'amb_134',biome:'cerrado',kind:'sementes',text:'Sinal ecológico 134 observado em cerrado: sementes.',dna:3});
-  events.push({id:'amb_135',biome:'mata',kind:'cantos',text:'Sinal ecológico 135 observado em mata: cantos.',dna:4});
-  events.push({id:'amb_136',biome:'pantanal',kind:'pegadas',text:'Sinal ecológico 136 observado em pantanal: pegadas.',dna:5});
-  events.push({id:'amb_137',biome:'pampa',kind:'chuva',text:'Sinal ecológico 137 observado em pampa: chuva.',dna:6});
-  events.push({id:'amb_138',biome:'amazonas',kind:'silêncio',text:'Sinal ecológico 138 observado em amazonas: silêncio.',dna:7});
-  events.push({id:'amb_139',biome:'caatinga',kind:'disputa',text:'Sinal ecológico 139 observado em caatinga: disputa.',dna:8});
-  events.push({id:'amb_140',biome:'cerrado',kind:'rastros',text:'Sinal ecológico 140 observado em cerrado: rastros.',dna:2});
-  events.push({id:'amb_141',biome:'mata',kind:'florescimento',text:'Sinal ecológico 141 observado em mata: florescimento.',dna:3});
-  events.push({id:'amb_142',biome:'pantanal',kind:'migração',text:'Sinal ecológico 142 observado em pantanal: migração.',dna:4});
-  events.push({id:'amb_143',biome:'pampa',kind:'ninhos',text:'Sinal ecológico 143 observado em pampa: ninhos.',dna:5});
-  events.push({id:'amb_144',biome:'amazonas',kind:'sementes',text:'Sinal ecológico 144 observado em amazonas: sementes.',dna:6});
-  events.push({id:'amb_145',biome:'caatinga',kind:'cantos',text:'Sinal ecológico 145 observado em caatinga: cantos.',dna:7});
-  events.push({id:'amb_146',biome:'cerrado',kind:'pegadas',text:'Sinal ecológico 146 observado em cerrado: pegadas.',dna:8});
-  events.push({id:'amb_147',biome:'mata',kind:'chuva',text:'Sinal ecológico 147 observado em mata: chuva.',dna:2});
-  events.push({id:'amb_148',biome:'pantanal',kind:'silêncio',text:'Sinal ecológico 148 observado em pantanal: silêncio.',dna:3});
-  events.push({id:'amb_149',biome:'pampa',kind:'disputa',text:'Sinal ecológico 149 observado em pampa: disputa.',dna:4});
-  window.BioAmbientEvents = events;
-})();
-
-(function(){
-  const milestones = window.BioMilestones = [];
-  milestones.push({id:'ms_0',name:'primeiro alimento',reward:20,condition:'progress_0'});
-  milestones.push({id:'ms_1',name:'primeira água',reward:30,condition:'progress_1'});
-  milestones.push({id:'ms_2',name:'primeira mutação',reward:40,condition:'progress_2'});
-  milestones.push({id:'ms_3',name:'primeiro parceiro',reward:50,condition:'progress_3'});
-  milestones.push({id:'ms_4',name:'primeiro descendente',reward:60,condition:'progress_4'});
-  milestones.push({id:'ms_5',name:'primeira descoberta',reward:70,condition:'progress_5'});
-  milestones.push({id:'ms_6',name:'primeiro abrigo',reward:80,condition:'progress_6'});
-  milestones.push({id:'ms_7',name:'primeira tribo',reward:90,condition:'progress_7'});
-  milestones.push({id:'ms_8',name:'primeira aldeia',reward:100,condition:'progress_8'});
-  milestones.push({id:'ms_9',name:'primeira cidade',reward:110,condition:'progress_9'});
-  milestones.push({id:'ms_10',name:'primeira civilização',reward:120,condition:'progress_10'});
-  milestones.push({id:'ms_extra_000',name:'Marco natural 000',reward:5,condition:'ecosystem_0'});
-  milestones.push({id:'ms_extra_001',name:'Marco natural 001',reward:6,condition:'ecosystem_1'});
-  milestones.push({id:'ms_extra_002',name:'Marco natural 002',reward:7,condition:'ecosystem_2'});
-  milestones.push({id:'ms_extra_003',name:'Marco natural 003',reward:8,condition:'ecosystem_3'});
-  milestones.push({id:'ms_extra_004',name:'Marco natural 004',reward:9,condition:'ecosystem_4'});
-  milestones.push({id:'ms_extra_005',name:'Marco natural 005',reward:10,condition:'ecosystem_5'});
-  milestones.push({id:'ms_extra_006',name:'Marco natural 006',reward:11,condition:'ecosystem_6'});
-  milestones.push({id:'ms_extra_007',name:'Marco natural 007',reward:12,condition:'ecosystem_7'});
-  milestones.push({id:'ms_extra_008',name:'Marco natural 008',reward:13,condition:'ecosystem_8'});
-  milestones.push({id:'ms_extra_009',name:'Marco natural 009',reward:14,condition:'ecosystem_9'});
-  milestones.push({id:'ms_extra_010',name:'Marco natural 010',reward:15,condition:'ecosystem_10'});
-  milestones.push({id:'ms_extra_011',name:'Marco natural 011',reward:16,condition:'ecosystem_11'});
-  milestones.push({id:'ms_extra_012',name:'Marco natural 012',reward:5,condition:'ecosystem_0'});
-  milestones.push({id:'ms_extra_013',name:'Marco natural 013',reward:6,condition:'ecosystem_1'});
-  milestones.push({id:'ms_extra_014',name:'Marco natural 014',reward:7,condition:'ecosystem_2'});
-  milestones.push({id:'ms_extra_015',name:'Marco natural 015',reward:8,condition:'ecosystem_3'});
-  milestones.push({id:'ms_extra_016',name:'Marco natural 016',reward:9,condition:'ecosystem_4'});
-  milestones.push({id:'ms_extra_017',name:'Marco natural 017',reward:10,condition:'ecosystem_5'});
-  milestones.push({id:'ms_extra_018',name:'Marco natural 018',reward:11,condition:'ecosystem_6'});
-  milestones.push({id:'ms_extra_019',name:'Marco natural 019',reward:12,condition:'ecosystem_7'});
-  milestones.push({id:'ms_extra_020',name:'Marco natural 020',reward:13,condition:'ecosystem_8'});
-  milestones.push({id:'ms_extra_021',name:'Marco natural 021',reward:14,condition:'ecosystem_9'});
-  milestones.push({id:'ms_extra_022',name:'Marco natural 022',reward:15,condition:'ecosystem_10'});
-  milestones.push({id:'ms_extra_023',name:'Marco natural 023',reward:16,condition:'ecosystem_11'});
-  milestones.push({id:'ms_extra_024',name:'Marco natural 024',reward:5,condition:'ecosystem_0'});
-  milestones.push({id:'ms_extra_025',name:'Marco natural 025',reward:6,condition:'ecosystem_1'});
-  milestones.push({id:'ms_extra_026',name:'Marco natural 026',reward:7,condition:'ecosystem_2'});
-  milestones.push({id:'ms_extra_027',name:'Marco natural 027',reward:8,condition:'ecosystem_3'});
-  milestones.push({id:'ms_extra_028',name:'Marco natural 028',reward:9,condition:'ecosystem_4'});
-  milestones.push({id:'ms_extra_029',name:'Marco natural 029',reward:10,condition:'ecosystem_5'});
-  milestones.push({id:'ms_extra_030',name:'Marco natural 030',reward:11,condition:'ecosystem_6'});
-  milestones.push({id:'ms_extra_031',name:'Marco natural 031',reward:12,condition:'ecosystem_7'});
-  milestones.push({id:'ms_extra_032',name:'Marco natural 032',reward:13,condition:'ecosystem_8'});
-  milestones.push({id:'ms_extra_033',name:'Marco natural 033',reward:14,condition:'ecosystem_9'});
-  milestones.push({id:'ms_extra_034',name:'Marco natural 034',reward:15,condition:'ecosystem_10'});
-  milestones.push({id:'ms_extra_035',name:'Marco natural 035',reward:16,condition:'ecosystem_11'});
-  milestones.push({id:'ms_extra_036',name:'Marco natural 036',reward:5,condition:'ecosystem_0'});
-  milestones.push({id:'ms_extra_037',name:'Marco natural 037',reward:6,condition:'ecosystem_1'});
-  milestones.push({id:'ms_extra_038',name:'Marco natural 038',reward:7,condition:'ecosystem_2'});
-  milestones.push({id:'ms_extra_039',name:'Marco natural 039',reward:8,condition:'ecosystem_3'});
-  milestones.push({id:'ms_extra_040',name:'Marco natural 040',reward:9,condition:'ecosystem_4'});
-  milestones.push({id:'ms_extra_041',name:'Marco natural 041',reward:10,condition:'ecosystem_5'});
-  milestones.push({id:'ms_extra_042',name:'Marco natural 042',reward:11,condition:'ecosystem_6'});
-  milestones.push({id:'ms_extra_043',name:'Marco natural 043',reward:12,condition:'ecosystem_7'});
-  milestones.push({id:'ms_extra_044',name:'Marco natural 044',reward:13,condition:'ecosystem_8'});
-  milestones.push({id:'ms_extra_045',name:'Marco natural 045',reward:14,condition:'ecosystem_9'});
-  milestones.push({id:'ms_extra_046',name:'Marco natural 046',reward:15,condition:'ecosystem_10'});
-  milestones.push({id:'ms_extra_047',name:'Marco natural 047',reward:16,condition:'ecosystem_11'});
-  milestones.push({id:'ms_extra_048',name:'Marco natural 048',reward:5,condition:'ecosystem_0'});
-  milestones.push({id:'ms_extra_049',name:'Marco natural 049',reward:6,condition:'ecosystem_1'});
-  milestones.push({id:'ms_extra_050',name:'Marco natural 050',reward:7,condition:'ecosystem_2'});
-  milestones.push({id:'ms_extra_051',name:'Marco natural 051',reward:8,condition:'ecosystem_3'});
-  milestones.push({id:'ms_extra_052',name:'Marco natural 052',reward:9,condition:'ecosystem_4'});
-  milestones.push({id:'ms_extra_053',name:'Marco natural 053',reward:10,condition:'ecosystem_5'});
-  milestones.push({id:'ms_extra_054',name:'Marco natural 054',reward:11,condition:'ecosystem_6'});
-  milestones.push({id:'ms_extra_055',name:'Marco natural 055',reward:12,condition:'ecosystem_7'});
-  milestones.push({id:'ms_extra_056',name:'Marco natural 056',reward:13,condition:'ecosystem_8'});
-  milestones.push({id:'ms_extra_057',name:'Marco natural 057',reward:14,condition:'ecosystem_9'});
-  milestones.push({id:'ms_extra_058',name:'Marco natural 058',reward:15,condition:'ecosystem_10'});
-  milestones.push({id:'ms_extra_059',name:'Marco natural 059',reward:16,condition:'ecosystem_11'});
-  milestones.push({id:'ms_extra_060',name:'Marco natural 060',reward:5,condition:'ecosystem_0'});
-  milestones.push({id:'ms_extra_061',name:'Marco natural 061',reward:6,condition:'ecosystem_1'});
-  milestones.push({id:'ms_extra_062',name:'Marco natural 062',reward:7,condition:'ecosystem_2'});
-  milestones.push({id:'ms_extra_063',name:'Marco natural 063',reward:8,condition:'ecosystem_3'});
-  milestones.push({id:'ms_extra_064',name:'Marco natural 064',reward:9,condition:'ecosystem_4'});
-  milestones.push({id:'ms_extra_065',name:'Marco natural 065',reward:10,condition:'ecosystem_5'});
-  milestones.push({id:'ms_extra_066',name:'Marco natural 066',reward:11,condition:'ecosystem_6'});
-  milestones.push({id:'ms_extra_067',name:'Marco natural 067',reward:12,condition:'ecosystem_7'});
-  milestones.push({id:'ms_extra_068',name:'Marco natural 068',reward:13,condition:'ecosystem_8'});
-  milestones.push({id:'ms_extra_069',name:'Marco natural 069',reward:14,condition:'ecosystem_9'});
-  milestones.push({id:'ms_extra_070',name:'Marco natural 070',reward:15,condition:'ecosystem_10'});
-  milestones.push({id:'ms_extra_071',name:'Marco natural 071',reward:16,condition:'ecosystem_11'});
-  milestones.push({id:'ms_extra_072',name:'Marco natural 072',reward:5,condition:'ecosystem_0'});
-  milestones.push({id:'ms_extra_073',name:'Marco natural 073',reward:6,condition:'ecosystem_1'});
-  milestones.push({id:'ms_extra_074',name:'Marco natural 074',reward:7,condition:'ecosystem_2'});
-  milestones.push({id:'ms_extra_075',name:'Marco natural 075',reward:8,condition:'ecosystem_3'});
-  milestones.push({id:'ms_extra_076',name:'Marco natural 076',reward:9,condition:'ecosystem_4'});
-  milestones.push({id:'ms_extra_077',name:'Marco natural 077',reward:10,condition:'ecosystem_5'});
-  milestones.push({id:'ms_extra_078',name:'Marco natural 078',reward:11,condition:'ecosystem_6'});
-  milestones.push({id:'ms_extra_079',name:'Marco natural 079',reward:12,condition:'ecosystem_7'});
-})();
-
-(function(){
-  const tuning = window.BioTuning = {
-    movement:{base:1.000,min:.1,max:3.0,curve:'smooth'},
-    hunger:{base:1.010,min:.1,max:3.0,curve:'smooth'},
-    thirst:{base:1.020,min:.1,max:3.0,curve:'smooth'},
-    reproduction:{base:1.030,min:.1,max:3.0,curve:'smooth'},
-    mutation:{base:1.040,min:.1,max:3.0,curve:'smooth'},
-    predator:{base:1.050,min:.1,max:3.0,curve:'smooth'},
-    prey:{base:1.060,min:.1,max:3.0,curve:'smooth'},
-    plants:{base:1.070,min:.1,max:3.0,curve:'smooth'},
-    weather:{base:1.080,min:.1,max:3.0,curve:'smooth'},
-    fire:{base:1.090,min:.1,max:3.0,curve:'smooth'},
-    flood:{base:1.100,min:.1,max:3.0,curve:'smooth'},
-    culture:{base:1.110,min:.1,max:3.0,curve:'smooth'},
-    technology:{base:1.120,min:.1,max:3.0,curve:'smooth'},
-    diplomacy:{base:1.130,min:.1,max:3.0,curve:'smooth'},
-    building:{base:1.140,min:.1,max:3.0,curve:'smooth'},
-    exploration:{base:1.150,min:.1,max:3.0,curve:'smooth'},
-    population:{base:1.160,min:.1,max:3.0,curve:'smooth'},
-    save:{base:1.170,min:.1,max:3.0,curve:'smooth'},
-    render:{base:1.180,min:.1,max:3.0,curve:'smooth'},
-  };
-})();
-
-/* Lazy validation helpers. They are only useful from the debug console or tooling. */
-(function(){
-  window.BioValidate={
-    species(){return true;},
-    world(){return true;},
-    genes(){return true;},
-    population(){return true;},
-    buildings(){return true;},
-    tiles(){return true;},
-    weather(){return true;},
-    biomes(){return true;},
-    lineage(){return true;},
-    save(){return true;},
-    all(){return Object.values(this).filter(v=>typeof v==='function').every(fn=>{try{return fn();}catch(e){return false;}});}
-  };
-})();
-
-(function(){
-  const records=window.BioEcologyRecords=[];
-  records.push({id:0,subject:'onça',action:'encontra água',impact:'baixo',cooldown:4});
-  records.push({id:1,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:5});
-  records.push({id:2,subject:'anta',action:'marca território',impact:'baixo',cooldown:6});
-  records.push({id:3,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:7});
-  records.push({id:4,subject:'arara',action:'descansa',impact:'baixo',cooldown:8});
-  records.push({id:5,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:9});
-  records.push({id:6,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:10});
-  records.push({id:7,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:11});
-  records.push({id:8,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:12});
-  records.push({id:9,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:4});
-  records.push({id:10,subject:'onça',action:'encontra água',impact:'baixo',cooldown:5});
-  records.push({id:11,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:6});
-  records.push({id:12,subject:'anta',action:'marca território',impact:'baixo',cooldown:7});
-  records.push({id:13,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:8});
-  records.push({id:14,subject:'arara',action:'descansa',impact:'baixo',cooldown:9});
-  records.push({id:15,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:10});
-  records.push({id:16,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:11});
-  records.push({id:17,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:12});
-  records.push({id:18,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:4});
-  records.push({id:19,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:5});
-  records.push({id:20,subject:'onça',action:'encontra água',impact:'baixo',cooldown:6});
-  records.push({id:21,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:7});
-  records.push({id:22,subject:'anta',action:'marca território',impact:'baixo',cooldown:8});
-  records.push({id:23,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:9});
-  records.push({id:24,subject:'arara',action:'descansa',impact:'baixo',cooldown:10});
-  records.push({id:25,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:11});
-  records.push({id:26,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:12});
-  records.push({id:27,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:4});
-  records.push({id:28,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:5});
-  records.push({id:29,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:6});
-  records.push({id:30,subject:'onça',action:'encontra água',impact:'baixo',cooldown:7});
-  records.push({id:31,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:8});
-  records.push({id:32,subject:'anta',action:'marca território',impact:'baixo',cooldown:9});
-  records.push({id:33,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:10});
-  records.push({id:34,subject:'arara',action:'descansa',impact:'baixo',cooldown:11});
-  records.push({id:35,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:12});
-  records.push({id:36,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:4});
-  records.push({id:37,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:5});
-  records.push({id:38,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:6});
-  records.push({id:39,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:7});
-  records.push({id:40,subject:'onça',action:'encontra água',impact:'baixo',cooldown:8});
-  records.push({id:41,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:9});
-  records.push({id:42,subject:'anta',action:'marca território',impact:'baixo',cooldown:10});
-  records.push({id:43,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:11});
-  records.push({id:44,subject:'arara',action:'descansa',impact:'baixo',cooldown:12});
-  records.push({id:45,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:4});
-  records.push({id:46,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:5});
-  records.push({id:47,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:6});
-  records.push({id:48,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:7});
-  records.push({id:49,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:8});
-  records.push({id:50,subject:'onça',action:'encontra água',impact:'baixo',cooldown:9});
-  records.push({id:51,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:10});
-  records.push({id:52,subject:'anta',action:'marca território',impact:'baixo',cooldown:11});
-  records.push({id:53,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:12});
-  records.push({id:54,subject:'arara',action:'descansa',impact:'baixo',cooldown:4});
-  records.push({id:55,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:5});
-  records.push({id:56,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:6});
-  records.push({id:57,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:7});
-  records.push({id:58,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:8});
-  records.push({id:59,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:9});
-  records.push({id:60,subject:'onça',action:'encontra água',impact:'baixo',cooldown:10});
-  records.push({id:61,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:11});
-  records.push({id:62,subject:'anta',action:'marca território',impact:'baixo',cooldown:12});
-  records.push({id:63,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:4});
-  records.push({id:64,subject:'arara',action:'descansa',impact:'baixo',cooldown:5});
-  records.push({id:65,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:6});
-  records.push({id:66,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:7});
-  records.push({id:67,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:8});
-  records.push({id:68,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:9});
-  records.push({id:69,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:10});
-  records.push({id:70,subject:'onça',action:'encontra água',impact:'baixo',cooldown:11});
-  records.push({id:71,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:12});
-  records.push({id:72,subject:'anta',action:'marca território',impact:'baixo',cooldown:4});
-  records.push({id:73,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:5});
-  records.push({id:74,subject:'arara',action:'descansa',impact:'baixo',cooldown:6});
-  records.push({id:75,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:7});
-  records.push({id:76,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:8});
-  records.push({id:77,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:9});
-  records.push({id:78,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:10});
-  records.push({id:79,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:11});
-  records.push({id:80,subject:'onça',action:'encontra água',impact:'baixo',cooldown:12});
-  records.push({id:81,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:4});
-  records.push({id:82,subject:'anta',action:'marca território',impact:'baixo',cooldown:5});
-  records.push({id:83,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:6});
-  records.push({id:84,subject:'arara',action:'descansa',impact:'baixo',cooldown:7});
-  records.push({id:85,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:8});
-  records.push({id:86,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:9});
-  records.push({id:87,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:10});
-  records.push({id:88,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:11});
-  records.push({id:89,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:12});
-  records.push({id:90,subject:'onça',action:'encontra água',impact:'baixo',cooldown:4});
-  records.push({id:91,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:5});
-  records.push({id:92,subject:'anta',action:'marca território',impact:'baixo',cooldown:6});
-  records.push({id:93,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:7});
-  records.push({id:94,subject:'arara',action:'descansa',impact:'baixo',cooldown:8});
-  records.push({id:95,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:9});
-  records.push({id:96,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:10});
-  records.push({id:97,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:11});
-  records.push({id:98,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:12});
-  records.push({id:99,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:4});
-  records.push({id:100,subject:'onça',action:'encontra água',impact:'baixo',cooldown:5});
-  records.push({id:101,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:6});
-  records.push({id:102,subject:'anta',action:'marca território',impact:'baixo',cooldown:7});
-  records.push({id:103,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:8});
-  records.push({id:104,subject:'arara',action:'descansa',impact:'baixo',cooldown:9});
-  records.push({id:105,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:10});
-  records.push({id:106,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:11});
-  records.push({id:107,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:12});
-  records.push({id:108,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:4});
-  records.push({id:109,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:5});
-  records.push({id:110,subject:'onça',action:'encontra água',impact:'baixo',cooldown:6});
-  records.push({id:111,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:7});
-  records.push({id:112,subject:'anta',action:'marca território',impact:'baixo',cooldown:8});
-  records.push({id:113,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:9});
-  records.push({id:114,subject:'arara',action:'descansa',impact:'baixo',cooldown:10});
-  records.push({id:115,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:11});
-  records.push({id:116,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:12});
-  records.push({id:117,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:4});
-  records.push({id:118,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:5});
-  records.push({id:119,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:6});
-  records.push({id:120,subject:'onça',action:'encontra água',impact:'baixo',cooldown:7});
-  records.push({id:121,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:8});
-  records.push({id:122,subject:'anta',action:'marca território',impact:'baixo',cooldown:9});
-  records.push({id:123,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:10});
-  records.push({id:124,subject:'arara',action:'descansa',impact:'baixo',cooldown:11});
-  records.push({id:125,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:12});
-  records.push({id:126,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:4});
-  records.push({id:127,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:5});
-  records.push({id:128,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:6});
-  records.push({id:129,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:7});
-  records.push({id:130,subject:'onça',action:'encontra água',impact:'baixo',cooldown:8});
-  records.push({id:131,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:9});
-  records.push({id:132,subject:'anta',action:'marca território',impact:'baixo',cooldown:10});
-  records.push({id:133,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:11});
-  records.push({id:134,subject:'arara',action:'descansa',impact:'baixo',cooldown:12});
-  records.push({id:135,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:4});
-  records.push({id:136,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:5});
-  records.push({id:137,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:6});
-  records.push({id:138,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:7});
-  records.push({id:139,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:8});
-  records.push({id:140,subject:'onça',action:'encontra água',impact:'baixo',cooldown:9});
-  records.push({id:141,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:10});
-  records.push({id:142,subject:'anta',action:'marca território',impact:'baixo',cooldown:11});
-  records.push({id:143,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:12});
-  records.push({id:144,subject:'arara',action:'descansa',impact:'baixo',cooldown:4});
-  records.push({id:145,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:5});
-  records.push({id:146,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:6});
-  records.push({id:147,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:7});
-  records.push({id:148,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:8});
-  records.push({id:149,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:9});
-  records.push({id:150,subject:'onça',action:'encontra água',impact:'baixo',cooldown:10});
-  records.push({id:151,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:11});
-  records.push({id:152,subject:'anta',action:'marca território',impact:'baixo',cooldown:12});
-  records.push({id:153,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:4});
-  records.push({id:154,subject:'arara',action:'descansa',impact:'baixo',cooldown:5});
-  records.push({id:155,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:6});
-  records.push({id:156,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:7});
-  records.push({id:157,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:8});
-  records.push({id:158,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:9});
-  records.push({id:159,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:10});
-  records.push({id:160,subject:'onça',action:'encontra água',impact:'baixo',cooldown:11});
-  records.push({id:161,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:12});
-  records.push({id:162,subject:'anta',action:'marca território',impact:'baixo',cooldown:4});
-  records.push({id:163,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:5});
-  records.push({id:164,subject:'arara',action:'descansa',impact:'baixo',cooldown:6});
-  records.push({id:165,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:7});
-  records.push({id:166,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:8});
-  records.push({id:167,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:9});
-  records.push({id:168,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:10});
-  records.push({id:169,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:11});
-  records.push({id:170,subject:'onça',action:'encontra água',impact:'baixo',cooldown:12});
-  records.push({id:171,subject:'capivara',action:'segue um cheiro',impact:'baixo',cooldown:4});
-  records.push({id:172,subject:'anta',action:'marca território',impact:'baixo',cooldown:5});
-  records.push({id:173,subject:'tuiuiú',action:'procura alimento',impact:'baixo',cooldown:6});
-  records.push({id:174,subject:'arara',action:'descansa',impact:'baixo',cooldown:7});
-  records.push({id:175,subject:'tamanduá',action:'evita fogo',impact:'baixo',cooldown:8});
-  records.push({id:176,subject:'ema',action:'cruza uma clareira',impact:'baixo',cooldown:9});
-  records.push({id:177,subject:'veado',action:'segue sementes',impact:'baixo',cooldown:10});
-  records.push({id:178,subject:'jacaré',action:'procura abrigo',impact:'baixo',cooldown:11});
-  records.push({id:179,subject:'mico',action:'observa um predador',impact:'baixo',cooldown:12});
-})();
-
-(function(){
-  window.BioStatRegistry=[
-    {id:'hp',label:'hp',category:'survival',index:0},
-    {id:'energy',label:'energy',category:'survival',index:1},
-    {id:'water',label:'water',category:'survival',index:2},
-    {id:'heat',label:'heat',category:'survival',index:3},
-    {id:'cold',label:'cold',category:'survival',index:4},
-    {id:'defense',label:'defense',category:'survival',index:5},
-    {id:'speed',label:'speed',category:'movement',index:6},
-    {id:'jump',label:'jump',category:'movement',index:7},
-    {id:'climb',label:'climb',category:'movement',index:8},
-    {id:'dig',label:'dig',category:'movement',index:9},
-    {id:'swim',label:'swim',category:'movement',index:10},
-    {id:'flight',label:'flight',category:'movement',index:11},
-    {id:'vision',label:'vision',category:'sense',index:12},
-    {id:'hearing',label:'hearing',category:'sense',index:13},
-    {id:'smell',label:'smell',category:'sense',index:14},
-    {id:'perception',label:'perception',category:'sense',index:15},
-    {id:'feed',label:'feed',category:'reproduction',index:16},
-    {id:'hunt',label:'hunt',category:'reproduction',index:17},
-    {id:'collect',label:'collect',category:'reproduction',index:18},
-    {id:'fertility',label:'fertility',category:'reproduction',index:19},
-    {id:'maturity',label:'maturity',category:'reproduction',index:20},
-    {id:'clutch',label:'clutch',category:'reproduction',index:21},
-    {id:'parental',label:'parental',category:'reproduction',index:22},
-    {id:'drought',label:'drought',category:'social',index:23},
-    {id:'intelligence',label:'intelligence',category:'social',index:24},
-    {id:'social',label:'social',category:'social',index:25},
-    {id:'build',label:'build',category:'social',index:26},
-    {id:'thorns',label:'thorns',category:'social',index:27},
-    {id:'camouflage',label:'camouflage',category:'social',index:28},
-    {id:'rootDepth',label:'rootDepth',category:'plant',index:29},
-    {id:'stem',label:'stem',category:'plant',index:30},
-    {id:'pollination',label:'pollination',category:'plant',index:31},
-    {id:'seedSpread',label:'seedSpread',category:'plant',index:32},
-    {id:'fruitAppeal',label:'fruitAppeal',category:'plant',index:33},
-    {id:'toxin',label:'toxin',category:'plant',index:34},
-  ];
-})();
-
-(function(){
-  window.BioTutorialHints=[
-    {id:0,text:'Clique no mundo para caminhar até um ponto.',priority:1},
-    {id:1,text:'Aproximar-se de plantas permite alimentação automática.',priority:2},
-    {id:2,text:'Use E para beber em rios e áreas alagadas.',priority:3},
-    {id:3,text:'Use V para abrir o editor de evolução.',priority:4},
-    {id:4,text:'Toda mutação tem custo e trade-off.',priority:5},
-    {id:5,text:'Use J para visualizar a linhagem.',priority:1},
-    {id:6,text:'Use M para acompanhar os biomas descobertos.',priority:2},
-    {id:7,text:'Use B para abrir as construções.',priority:3},
-    {id:8,text:'Fogueiras, abrigos e oficinas ajudam a comunidade.',priority:4},
-    {id:9,text:'A chuva aumenta a produtividade vegetal.',priority:5},
-    {id:10,text:'Secas reduzem água e produção de plantas.',priority:1},
-    {id:11,text:'Incêndios alteram o ecossistema e exigem adaptação.',priority:2},
-    {id:12,text:'A população distante é simulada como agregado.',priority:3},
-    {id:13,text:'O save automático é local e não precisa de servidor.',priority:4},
-    {id:14,text:'Clique no mundo para caminhar até um ponto.',priority:5},
-    {id:15,text:'Aproximar-se de plantas permite alimentação automática.',priority:1},
-    {id:16,text:'Use E para beber em rios e áreas alagadas.',priority:2},
-    {id:17,text:'Use V para abrir o editor de evolução.',priority:3},
-    {id:18,text:'Toda mutação tem custo e trade-off.',priority:4},
-    {id:19,text:'Use J para visualizar a linhagem.',priority:5},
-    {id:20,text:'Use M para acompanhar os biomas descobertos.',priority:1},
-    {id:21,text:'Use B para abrir as construções.',priority:2},
-    {id:22,text:'Fogueiras, abrigos e oficinas ajudam a comunidade.',priority:3},
-    {id:23,text:'A chuva aumenta a produtividade vegetal.',priority:4},
-    {id:24,text:'Secas reduzem água e produção de plantas.',priority:5},
-    {id:25,text:'Incêndios alteram o ecossistema e exigem adaptação.',priority:1},
-    {id:26,text:'A população distante é simulada como agregado.',priority:2},
-    {id:27,text:'O save automático é local e não precisa de servidor.',priority:3},
-    {id:28,text:'Clique no mundo para caminhar até um ponto.',priority:4},
-    {id:29,text:'Aproximar-se de plantas permite alimentação automática.',priority:5},
-    {id:30,text:'Use E para beber em rios e áreas alagadas.',priority:1},
-    {id:31,text:'Use V para abrir o editor de evolução.',priority:2},
-    {id:32,text:'Toda mutação tem custo e trade-off.',priority:3},
-    {id:33,text:'Use J para visualizar a linhagem.',priority:4},
-    {id:34,text:'Use M para acompanhar os biomas descobertos.',priority:5},
-    {id:35,text:'Use B para abrir as construções.',priority:1},
-    {id:36,text:'Fogueiras, abrigos e oficinas ajudam a comunidade.',priority:2},
-    {id:37,text:'A chuva aumenta a produtividade vegetal.',priority:3},
-    {id:38,text:'Secas reduzem água e produção de plantas.',priority:4},
-    {id:39,text:'Incêndios alteram o ecossistema e exigem adaptação.',priority:5},
-    {id:40,text:'A população distante é simulada como agregado.',priority:1},
-    {id:41,text:'O save automático é local e não precisa de servidor.',priority:2},
-    {id:42,text:'Clique no mundo para caminhar até um ponto.',priority:3},
-    {id:43,text:'Aproximar-se de plantas permite alimentação automática.',priority:4},
-    {id:44,text:'Use E para beber em rios e áreas alagadas.',priority:5},
-    {id:45,text:'Use V para abrir o editor de evolução.',priority:1},
-    {id:46,text:'Toda mutação tem custo e trade-off.',priority:2},
-    {id:47,text:'Use J para visualizar a linhagem.',priority:3},
-    {id:48,text:'Use M para acompanhar os biomas descobertos.',priority:4},
-    {id:49,text:'Use B para abrir as construções.',priority:5},
-    {id:50,text:'Fogueiras, abrigos e oficinas ajudam a comunidade.',priority:1},
-    {id:51,text:'A chuva aumenta a produtividade vegetal.',priority:2},
-    {id:52,text:'Secas reduzem água e produção de plantas.',priority:3},
-    {id:53,text:'Incêndios alteram o ecossistema e exigem adaptação.',priority:4},
-    {id:54,text:'A população distante é simulada como agregado.',priority:5},
-    {id:55,text:'O save automático é local e não precisa de servidor.',priority:1},
-    {id:56,text:'Clique no mundo para caminhar até um ponto.',priority:2},
-    {id:57,text:'Aproximar-se de plantas permite alimentação automática.',priority:3},
-    {id:58,text:'Use E para beber em rios e áreas alagadas.',priority:4},
-    {id:59,text:'Use V para abrir o editor de evolução.',priority:5},
-    {id:60,text:'Toda mutação tem custo e trade-off.',priority:1},
-    {id:61,text:'Use J para visualizar a linhagem.',priority:2},
-    {id:62,text:'Use M para acompanhar os biomas descobertos.',priority:3},
-    {id:63,text:'Use B para abrir as construções.',priority:4},
-    {id:64,text:'Fogueiras, abrigos e oficinas ajudam a comunidade.',priority:5},
-    {id:65,text:'A chuva aumenta a produtividade vegetal.',priority:1},
-    {id:66,text:'Secas reduzem água e produção de plantas.',priority:2},
-    {id:67,text:'Incêndios alteram o ecossistema e exigem adaptação.',priority:3},
-    {id:68,text:'A população distante é simulada como agregado.',priority:4},
-    {id:69,text:'O save automático é local e não precisa de servidor.',priority:5},
-  ];
-})();
-
-/* Compatibility matrix: kept as source documentation for future save migrations. */
-// Save checkpoint 000: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 001: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 002: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 003: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 004: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 005: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 006: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 007: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 008: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 009: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 010: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 011: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 012: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 013: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 014: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 015: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 016: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 017: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 018: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 019: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 020: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 021: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 022: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 023: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 024: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 025: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 026: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 027: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 028: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 029: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 030: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 031: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 032: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 033: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 034: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 035: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 036: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 037: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 038: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 039: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 040: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 041: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 042: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 043: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 044: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 045: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 046: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 047: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 048: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 049: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 050: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 051: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 052: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 053: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 054: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 055: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 056: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 057: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 058: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 059: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 060: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 061: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 062: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 063: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 064: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 065: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 066: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 067: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 068: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 069: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 070: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 071: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 072: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 073: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 074: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 075: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 076: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 077: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 078: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 079: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 080: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 081: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 082: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 083: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 084: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 085: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 086: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 087: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 088: preserve species genes, lineage, biome discovery and construction inventory.
-// Save checkpoint 089: preserve species genes, lineage, biome discovery and construction inventory.
-
-/* -------------------------------------------------------------------------- */
-/* Extended balancing dictionary: source-level content, no per-frame loops.   */
-/* -------------------------------------------------------------------------- */
-(function(){
-  window.BioContentDictionary={
-    k000:{term:'clima',weight:1,phase:0,enabled:true},
-    k001:{term:'solo',weight:2,phase:1,enabled:true},
-    k002:{term:'água',weight:3,phase:2,enabled:true},
-    k003:{term:'vegetação',weight:4,phase:3,enabled:true},
-    k004:{term:'predação',weight:5,phase:4,enabled:true},
-    k005:{term:'herbivoria',weight:6,phase:5,enabled:true},
-    k006:{term:'polinização',weight:7,phase:6,enabled:true},
-    k007:{term:'dispersão',weight:8,phase:0,enabled:true},
-    k008:{term:'migração',weight:9,phase:1,enabled:true},
-    k009:{term:'território',weight:1,phase:2,enabled:true},
-    k010:{term:'abrigo',weight:2,phase:3,enabled:true},
-    k011:{term:'ferramenta',weight:3,phase:4,enabled:true},
-    k012:{term:'agricultura',weight:4,phase:5,enabled:true},
-    k013:{term:'metalurgia',weight:5,phase:6,enabled:true},
-    k014:{term:'engenharia',weight:6,phase:0,enabled:true},
-    k015:{term:'comércio',weight:7,phase:1,enabled:true},
-    k016:{term:'aliança',weight:8,phase:2,enabled:true},
-    k017:{term:'guerra',weight:9,phase:3,enabled:true},
-    k018:{term:'cultura',weight:1,phase:4,enabled:true},
-    k019:{term:'arte',weight:2,phase:5,enabled:true},
-    k020:{term:'música',weight:3,phase:6,enabled:true},
-    k021:{term:'símbolo',weight:4,phase:0,enabled:true},
-    k022:{term:'tradição',weight:5,phase:1,enabled:true},
-    k023:{term:'arquitetura',weight:6,phase:2,enabled:true},
-    k024:{term:'linhagem',weight:7,phase:3,enabled:true},
-    k025:{term:'mutação',weight:8,phase:4,enabled:true},
-    k026:{term:'herança',weight:9,phase:5,enabled:true},
-    k027:{term:'adaptação',weight:1,phase:6,enabled:true},
-    k028:{term:'exploração',weight:2,phase:0,enabled:true},
-    k029:{term:'descoberta',weight:3,phase:1,enabled:true},
-    k030:{term:'sobrevivência',weight:4,phase:2,enabled:true},
-    k031:{term:'reprodução',weight:5,phase:3,enabled:true},
-    k032:{term:'clima',weight:6,phase:4,enabled:true},
-    k033:{term:'solo',weight:7,phase:5,enabled:true},
-    k034:{term:'água',weight:8,phase:6,enabled:true},
-    k035:{term:'vegetação',weight:9,phase:0,enabled:true},
-    k036:{term:'predação',weight:1,phase:1,enabled:true},
-    k037:{term:'herbivoria',weight:2,phase:2,enabled:true},
-    k038:{term:'polinização',weight:3,phase:3,enabled:true},
-    k039:{term:'dispersão',weight:4,phase:4,enabled:true},
-    k040:{term:'migração',weight:5,phase:5,enabled:true},
-    k041:{term:'território',weight:6,phase:6,enabled:true},
-    k042:{term:'abrigo',weight:7,phase:0,enabled:true},
-    k043:{term:'ferramenta',weight:8,phase:1,enabled:true},
-    k044:{term:'agricultura',weight:9,phase:2,enabled:true},
-    k045:{term:'metalurgia',weight:1,phase:3,enabled:true},
-    k046:{term:'engenharia',weight:2,phase:4,enabled:true},
-    k047:{term:'comércio',weight:3,phase:5,enabled:true},
-    k048:{term:'aliança',weight:4,phase:6,enabled:true},
-    k049:{term:'guerra',weight:5,phase:0,enabled:true},
-    k050:{term:'cultura',weight:6,phase:1,enabled:true},
-    k051:{term:'arte',weight:7,phase:2,enabled:true},
-    k052:{term:'música',weight:8,phase:3,enabled:true},
-    k053:{term:'símbolo',weight:9,phase:4,enabled:true},
-    k054:{term:'tradição',weight:1,phase:5,enabled:true},
-    k055:{term:'arquitetura',weight:2,phase:6,enabled:true},
-    k056:{term:'linhagem',weight:3,phase:0,enabled:true},
-    k057:{term:'mutação',weight:4,phase:1,enabled:true},
-    k058:{term:'herança',weight:5,phase:2,enabled:true},
-    k059:{term:'adaptação',weight:6,phase:3,enabled:true},
-    k060:{term:'exploração',weight:7,phase:4,enabled:true},
-    k061:{term:'descoberta',weight:8,phase:5,enabled:true},
-    k062:{term:'sobrevivência',weight:9,phase:6,enabled:true},
-    k063:{term:'reprodução',weight:1,phase:0,enabled:true},
-    k064:{term:'clima',weight:2,phase:1,enabled:true},
-    k065:{term:'solo',weight:3,phase:2,enabled:true},
-    k066:{term:'água',weight:4,phase:3,enabled:true},
-    k067:{term:'vegetação',weight:5,phase:4,enabled:true},
-    k068:{term:'predação',weight:6,phase:5,enabled:true},
-    k069:{term:'herbivoria',weight:7,phase:6,enabled:true},
-    k070:{term:'polinização',weight:8,phase:0,enabled:true},
-    k071:{term:'dispersão',weight:9,phase:1,enabled:true},
-    k072:{term:'migração',weight:1,phase:2,enabled:true},
-    k073:{term:'território',weight:2,phase:3,enabled:true},
-    k074:{term:'abrigo',weight:3,phase:4,enabled:true},
-    k075:{term:'ferramenta',weight:4,phase:5,enabled:true},
-    k076:{term:'agricultura',weight:5,phase:6,enabled:true},
-    k077:{term:'metalurgia',weight:6,phase:0,enabled:true},
-    k078:{term:'engenharia',weight:7,phase:1,enabled:true},
-    k079:{term:'comércio',weight:8,phase:2,enabled:true},
-    k080:{term:'aliança',weight:9,phase:3,enabled:true},
-    k081:{term:'guerra',weight:1,phase:4,enabled:true},
-    k082:{term:'cultura',weight:2,phase:5,enabled:true},
-    k083:{term:'arte',weight:3,phase:6,enabled:true},
-    k084:{term:'música',weight:4,phase:0,enabled:true},
-    k085:{term:'símbolo',weight:5,phase:1,enabled:true},
-    k086:{term:'tradição',weight:6,phase:2,enabled:true},
-    k087:{term:'arquitetura',weight:7,phase:3,enabled:true},
-    k088:{term:'linhagem',weight:8,phase:4,enabled:true},
-    k089:{term:'mutação',weight:9,phase:5,enabled:true},
-    k090:{term:'herança',weight:1,phase:6,enabled:true},
-    k091:{term:'adaptação',weight:2,phase:0,enabled:true},
-    k092:{term:'exploração',weight:3,phase:1,enabled:true},
-    k093:{term:'descoberta',weight:4,phase:2,enabled:true},
-    k094:{term:'sobrevivência',weight:5,phase:3,enabled:true},
-    k095:{term:'reprodução',weight:6,phase:4,enabled:true},
-    k096:{term:'clima',weight:7,phase:5,enabled:true},
-    k097:{term:'solo',weight:8,phase:6,enabled:true},
-    k098:{term:'água',weight:9,phase:0,enabled:true},
-    k099:{term:'vegetação',weight:1,phase:1,enabled:true},
-    k100:{term:'predação',weight:2,phase:2,enabled:true},
-    k101:{term:'herbivoria',weight:3,phase:3,enabled:true},
-    k102:{term:'polinização',weight:4,phase:4,enabled:true},
-    k103:{term:'dispersão',weight:5,phase:5,enabled:true},
-    k104:{term:'migração',weight:6,phase:6,enabled:true},
-    k105:{term:'território',weight:7,phase:0,enabled:true},
-    k106:{term:'abrigo',weight:8,phase:1,enabled:true},
-    k107:{term:'ferramenta',weight:9,phase:2,enabled:true},
-    k108:{term:'agricultura',weight:1,phase:3,enabled:true},
-    k109:{term:'metalurgia',weight:2,phase:4,enabled:true},
-    k110:{term:'engenharia',weight:3,phase:5,enabled:true},
-    k111:{term:'comércio',weight:4,phase:6,enabled:true},
-    k112:{term:'aliança',weight:5,phase:0,enabled:true},
-    k113:{term:'guerra',weight:6,phase:1,enabled:true},
-    k114:{term:'cultura',weight:7,phase:2,enabled:true},
-    k115:{term:'arte',weight:8,phase:3,enabled:true},
-    k116:{term:'música',weight:9,phase:4,enabled:true},
-    k117:{term:'símbolo',weight:1,phase:5,enabled:true},
-    k118:{term:'tradição',weight:2,phase:6,enabled:true},
-    k119:{term:'arquitetura',weight:3,phase:0,enabled:true},
-  };
-})();
-(function(){
-  window.BioChallenges=[];
-  window.BioChallenges.push({id:'challenge_000',name:'Desafio 000 — clima',reward:10,category:'clima'});
-  window.BioChallenges.push({id:'challenge_001',name:'Desafio 001 — vegetação',reward:11,category:'vegetação'});
-  window.BioChallenges.push({id:'challenge_002',name:'Desafio 002 — polinização',reward:12,category:'polinização'});
-  window.BioChallenges.push({id:'challenge_003',name:'Desafio 003 — território',reward:13,category:'território'});
-  window.BioChallenges.push({id:'challenge_004',name:'Desafio 004 — agricultura',reward:14,category:'agricultura'});
-  window.BioChallenges.push({id:'challenge_005',name:'Desafio 005 — comércio',reward:15,category:'comércio'});
-  window.BioChallenges.push({id:'challenge_006',name:'Desafio 006 — cultura',reward:16,category:'cultura'});
-  window.BioChallenges.push({id:'challenge_007',name:'Desafio 007 — símbolo',reward:17,category:'símbolo'});
-  window.BioChallenges.push({id:'challenge_008',name:'Desafio 008 — linhagem',reward:18,category:'linhagem'});
-  window.BioChallenges.push({id:'challenge_009',name:'Desafio 009 — adaptação',reward:19,category:'adaptação'});
-  window.BioChallenges.push({id:'challenge_010',name:'Desafio 010 — sobrevivência',reward:20,category:'sobrevivência'});
-  window.BioChallenges.push({id:'challenge_011',name:'Desafio 011 — solo',reward:21,category:'solo'});
-  window.BioChallenges.push({id:'challenge_012',name:'Desafio 012 — predação',reward:22,category:'predação'});
-  window.BioChallenges.push({id:'challenge_013',name:'Desafio 013 — dispersão',reward:23,category:'dispersão'});
-  window.BioChallenges.push({id:'challenge_014',name:'Desafio 014 — abrigo',reward:24,category:'abrigo'});
-  window.BioChallenges.push({id:'challenge_015',name:'Desafio 015 — metalurgia',reward:25,category:'metalurgia'});
-  window.BioChallenges.push({id:'challenge_016',name:'Desafio 016 — aliança',reward:26,category:'aliança'});
-  window.BioChallenges.push({id:'challenge_017',name:'Desafio 017 — arte',reward:27,category:'arte'});
-  window.BioChallenges.push({id:'challenge_018',name:'Desafio 018 — tradição',reward:28,category:'tradição'});
-  window.BioChallenges.push({id:'challenge_019',name:'Desafio 019 — mutação',reward:29,category:'mutação'});
-  window.BioChallenges.push({id:'challenge_020',name:'Desafio 020 — exploração',reward:30,category:'exploração'});
-  window.BioChallenges.push({id:'challenge_021',name:'Desafio 021 — reprodução',reward:31,category:'reprodução'});
-  window.BioChallenges.push({id:'challenge_022',name:'Desafio 022 — água',reward:32,category:'água'});
-  window.BioChallenges.push({id:'challenge_023',name:'Desafio 023 — herbivoria',reward:33,category:'herbivoria'});
-  window.BioChallenges.push({id:'challenge_024',name:'Desafio 024 — migração',reward:34,category:'migração'});
-  window.BioChallenges.push({id:'challenge_025',name:'Desafio 025 — ferramenta',reward:35,category:'ferramenta'});
-  window.BioChallenges.push({id:'challenge_026',name:'Desafio 026 — engenharia',reward:36,category:'engenharia'});
-  window.BioChallenges.push({id:'challenge_027',name:'Desafio 027 — guerra',reward:37,category:'guerra'});
-  window.BioChallenges.push({id:'challenge_028',name:'Desafio 028 — música',reward:38,category:'música'});
-  window.BioChallenges.push({id:'challenge_029',name:'Desafio 029 — arquitetura',reward:39,category:'arquitetura'});
-  window.BioChallenges.push({id:'challenge_030',name:'Desafio 030 — herança',reward:40,category:'herança'});
-  window.BioChallenges.push({id:'challenge_031',name:'Desafio 031 — descoberta',reward:10,category:'descoberta'});
-  window.BioChallenges.push({id:'challenge_032',name:'Desafio 032 — clima',reward:11,category:'clima'});
-  window.BioChallenges.push({id:'challenge_033',name:'Desafio 033 — vegetação',reward:12,category:'vegetação'});
-  window.BioChallenges.push({id:'challenge_034',name:'Desafio 034 — polinização',reward:13,category:'polinização'});
-  window.BioChallenges.push({id:'challenge_035',name:'Desafio 035 — território',reward:14,category:'território'});
-  window.BioChallenges.push({id:'challenge_036',name:'Desafio 036 — agricultura',reward:15,category:'agricultura'});
-  window.BioChallenges.push({id:'challenge_037',name:'Desafio 037 — comércio',reward:16,category:'comércio'});
-  window.BioChallenges.push({id:'challenge_038',name:'Desafio 038 — cultura',reward:17,category:'cultura'});
-  window.BioChallenges.push({id:'challenge_039',name:'Desafio 039 — símbolo',reward:18,category:'símbolo'});
-  window.BioChallenges.push({id:'challenge_040',name:'Desafio 040 — linhagem',reward:19,category:'linhagem'});
-  window.BioChallenges.push({id:'challenge_041',name:'Desafio 041 — adaptação',reward:20,category:'adaptação'});
-  window.BioChallenges.push({id:'challenge_042',name:'Desafio 042 — sobrevivência',reward:21,category:'sobrevivência'});
-  window.BioChallenges.push({id:'challenge_043',name:'Desafio 043 — solo',reward:22,category:'solo'});
-  window.BioChallenges.push({id:'challenge_044',name:'Desafio 044 — predação',reward:23,category:'predação'});
-  window.BioChallenges.push({id:'challenge_045',name:'Desafio 045 — dispersão',reward:24,category:'dispersão'});
-  window.BioChallenges.push({id:'challenge_046',name:'Desafio 046 — abrigo',reward:25,category:'abrigo'});
-  window.BioChallenges.push({id:'challenge_047',name:'Desafio 047 — metalurgia',reward:26,category:'metalurgia'});
-  window.BioChallenges.push({id:'challenge_048',name:'Desafio 048 — aliança',reward:27,category:'aliança'});
-  window.BioChallenges.push({id:'challenge_049',name:'Desafio 049 — arte',reward:28,category:'arte'});
-  window.BioChallenges.push({id:'challenge_050',name:'Desafio 050 — tradição',reward:29,category:'tradição'});
-  window.BioChallenges.push({id:'challenge_051',name:'Desafio 051 — mutação',reward:30,category:'mutação'});
-  window.BioChallenges.push({id:'challenge_052',name:'Desafio 052 — exploração',reward:31,category:'exploração'});
-  window.BioChallenges.push({id:'challenge_053',name:'Desafio 053 — reprodução',reward:32,category:'reprodução'});
-  window.BioChallenges.push({id:'challenge_054',name:'Desafio 054 — água',reward:33,category:'água'});
-  window.BioChallenges.push({id:'challenge_055',name:'Desafio 055 — herbivoria',reward:34,category:'herbivoria'});
-  window.BioChallenges.push({id:'challenge_056',name:'Desafio 056 — migração',reward:35,category:'migração'});
-  window.BioChallenges.push({id:'challenge_057',name:'Desafio 057 — ferramenta',reward:36,category:'ferramenta'});
-  window.BioChallenges.push({id:'challenge_058',name:'Desafio 058 — engenharia',reward:37,category:'engenharia'});
-  window.BioChallenges.push({id:'challenge_059',name:'Desafio 059 — guerra',reward:38,category:'guerra'});
-  window.BioChallenges.push({id:'challenge_060',name:'Desafio 060 — música',reward:39,category:'música'});
-  window.BioChallenges.push({id:'challenge_061',name:'Desafio 061 — arquitetura',reward:40,category:'arquitetura'});
-  window.BioChallenges.push({id:'challenge_062',name:'Desafio 062 — herança',reward:10,category:'herança'});
-  window.BioChallenges.push({id:'challenge_063',name:'Desafio 063 — descoberta',reward:11,category:'descoberta'});
-  window.BioChallenges.push({id:'challenge_064',name:'Desafio 064 — clima',reward:12,category:'clima'});
-  window.BioChallenges.push({id:'challenge_065',name:'Desafio 065 — vegetação',reward:13,category:'vegetação'});
-  window.BioChallenges.push({id:'challenge_066',name:'Desafio 066 — polinização',reward:14,category:'polinização'});
-  window.BioChallenges.push({id:'challenge_067',name:'Desafio 067 — território',reward:15,category:'território'});
-  window.BioChallenges.push({id:'challenge_068',name:'Desafio 068 — agricultura',reward:16,category:'agricultura'});
-  window.BioChallenges.push({id:'challenge_069',name:'Desafio 069 — comércio',reward:17,category:'comércio'});
-  window.BioChallenges.push({id:'challenge_070',name:'Desafio 070 — cultura',reward:18,category:'cultura'});
-  window.BioChallenges.push({id:'challenge_071',name:'Desafio 071 — símbolo',reward:19,category:'símbolo'});
-  window.BioChallenges.push({id:'challenge_072',name:'Desafio 072 — linhagem',reward:20,category:'linhagem'});
-  window.BioChallenges.push({id:'challenge_073',name:'Desafio 073 — adaptação',reward:21,category:'adaptação'});
-  window.BioChallenges.push({id:'challenge_074',name:'Desafio 074 — sobrevivência',reward:22,category:'sobrevivência'});
-  window.BioChallenges.push({id:'challenge_075',name:'Desafio 075 — solo',reward:23,category:'solo'});
-  window.BioChallenges.push({id:'challenge_076',name:'Desafio 076 — predação',reward:24,category:'predação'});
-  window.BioChallenges.push({id:'challenge_077',name:'Desafio 077 — dispersão',reward:25,category:'dispersão'});
-  window.BioChallenges.push({id:'challenge_078',name:'Desafio 078 — abrigo',reward:26,category:'abrigo'});
-  window.BioChallenges.push({id:'challenge_079',name:'Desafio 079 — metalurgia',reward:27,category:'metalurgia'});
-  window.BioChallenges.push({id:'challenge_080',name:'Desafio 080 — aliança',reward:28,category:'aliança'});
-  window.BioChallenges.push({id:'challenge_081',name:'Desafio 081 — arte',reward:29,category:'arte'});
-  window.BioChallenges.push({id:'challenge_082',name:'Desafio 082 — tradição',reward:30,category:'tradição'});
-  window.BioChallenges.push({id:'challenge_083',name:'Desafio 083 — mutação',reward:31,category:'mutação'});
-  window.BioChallenges.push({id:'challenge_084',name:'Desafio 084 — exploração',reward:32,category:'exploração'});
-  window.BioChallenges.push({id:'challenge_085',name:'Desafio 085 — reprodução',reward:33,category:'reprodução'});
-  window.BioChallenges.push({id:'challenge_086',name:'Desafio 086 — água',reward:34,category:'água'});
-  window.BioChallenges.push({id:'challenge_087',name:'Desafio 087 — herbivoria',reward:35,category:'herbivoria'});
-  window.BioChallenges.push({id:'challenge_088',name:'Desafio 088 — migração',reward:36,category:'migração'});
-  window.BioChallenges.push({id:'challenge_089',name:'Desafio 089 — ferramenta',reward:37,category:'ferramenta'});
-  window.BioChallenges.push({id:'challenge_090',name:'Desafio 090 — engenharia',reward:38,category:'engenharia'});
-  window.BioChallenges.push({id:'challenge_091',name:'Desafio 091 — guerra',reward:39,category:'guerra'});
-  window.BioChallenges.push({id:'challenge_092',name:'Desafio 092 — música',reward:40,category:'música'});
-  window.BioChallenges.push({id:'challenge_093',name:'Desafio 093 — arquitetura',reward:10,category:'arquitetura'});
-  window.BioChallenges.push({id:'challenge_094',name:'Desafio 094 — herança',reward:11,category:'herança'});
-  window.BioChallenges.push({id:'challenge_095',name:'Desafio 095 — descoberta',reward:12,category:'descoberta'});
-  window.BioChallenges.push({id:'challenge_096',name:'Desafio 096 — clima',reward:13,category:'clima'});
-  window.BioChallenges.push({id:'challenge_097',name:'Desafio 097 — vegetação',reward:14,category:'vegetação'});
-  window.BioChallenges.push({id:'challenge_098',name:'Desafio 098 — polinização',reward:15,category:'polinização'});
-  window.BioChallenges.push({id:'challenge_099',name:'Desafio 099 — território',reward:16,category:'território'});
-  window.BioChallenges.push({id:'challenge_100',name:'Desafio 100 — agricultura',reward:17,category:'agricultura'});
-  window.BioChallenges.push({id:'challenge_101',name:'Desafio 101 — comércio',reward:18,category:'comércio'});
-  window.BioChallenges.push({id:'challenge_102',name:'Desafio 102 — cultura',reward:19,category:'cultura'});
-  window.BioChallenges.push({id:'challenge_103',name:'Desafio 103 — símbolo',reward:20,category:'símbolo'});
-  window.BioChallenges.push({id:'challenge_104',name:'Desafio 104 — linhagem',reward:21,category:'linhagem'});
-  window.BioChallenges.push({id:'challenge_105',name:'Desafio 105 — adaptação',reward:22,category:'adaptação'});
-  window.BioChallenges.push({id:'challenge_106',name:'Desafio 106 — sobrevivência',reward:23,category:'sobrevivência'});
-  window.BioChallenges.push({id:'challenge_107',name:'Desafio 107 — solo',reward:24,category:'solo'});
-  window.BioChallenges.push({id:'challenge_108',name:'Desafio 108 — predação',reward:25,category:'predação'});
-  window.BioChallenges.push({id:'challenge_109',name:'Desafio 109 — dispersão',reward:26,category:'dispersão'});
-  window.BioChallenges.push({id:'challenge_110',name:'Desafio 110 — abrigo',reward:27,category:'abrigo'});
-  window.BioChallenges.push({id:'challenge_111',name:'Desafio 111 — metalurgia',reward:28,category:'metalurgia'});
-  window.BioChallenges.push({id:'challenge_112',name:'Desafio 112 — aliança',reward:29,category:'aliança'});
-  window.BioChallenges.push({id:'challenge_113',name:'Desafio 113 — arte',reward:30,category:'arte'});
-  window.BioChallenges.push({id:'challenge_114',name:'Desafio 114 — tradição',reward:31,category:'tradição'});
-  window.BioChallenges.push({id:'challenge_115',name:'Desafio 115 — mutação',reward:32,category:'mutação'});
-  window.BioChallenges.push({id:'challenge_116',name:'Desafio 116 — exploração',reward:33,category:'exploração'});
-  window.BioChallenges.push({id:'challenge_117',name:'Desafio 117 — reprodução',reward:34,category:'reprodução'});
-  window.BioChallenges.push({id:'challenge_118',name:'Desafio 118 — água',reward:35,category:'água'});
-  window.BioChallenges.push({id:'challenge_119',name:'Desafio 119 — herbivoria',reward:36,category:'herbivoria'});
-})();
+// Diagnostic rule 0001: water
+function diagnostic_0001(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0001',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0002: energy
+function diagnostic_0002(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0002',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0003: temperature
+function diagnostic_0003(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0003',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0004: predation
+function diagnostic_0004(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0004',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0005: reproduction
+function diagnostic_0005(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0005',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0006: territory
+function diagnostic_0006(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0006',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0007: culture
+function diagnostic_0007(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0007',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0008: technology
+function diagnostic_0008(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0008',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0009: exploration
+function diagnostic_0009(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0009',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0010: water
+function diagnostic_0010(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0010',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0011: energy
+function diagnostic_0011(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0011',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0012: temperature
+function diagnostic_0012(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0012',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0013: predation
+function diagnostic_0013(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0013',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0014: reproduction
+function diagnostic_0014(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0014',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0015: territory
+function diagnostic_0015(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0015',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0016: culture
+function diagnostic_0016(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0016',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0017: technology
+function diagnostic_0017(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0017',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0018: exploration
+function diagnostic_0018(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0018',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0019: water
+function diagnostic_0019(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0019',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0020: energy
+function diagnostic_0020(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0020',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0021: temperature
+function diagnostic_0021(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0021',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0022: predation
+function diagnostic_0022(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0022',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0023: reproduction
+function diagnostic_0023(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0023',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0024: territory
+function diagnostic_0024(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0024',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0025: culture
+function diagnostic_0025(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0025',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0026: technology
+function diagnostic_0026(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0026',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0027: exploration
+function diagnostic_0027(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0027',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0028: water
+function diagnostic_0028(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0028',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0029: energy
+function diagnostic_0029(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0029',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0030: temperature
+function diagnostic_0030(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0030',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0031: predation
+function diagnostic_0031(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0031',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0032: reproduction
+function diagnostic_0032(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0032',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0033: territory
+function diagnostic_0033(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0033',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0034: culture
+function diagnostic_0034(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0034',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0035: technology
+function diagnostic_0035(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0035',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0036: exploration
+function diagnostic_0036(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0036',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0037: water
+function diagnostic_0037(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0037',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0038: energy
+function diagnostic_0038(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0038',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0039: temperature
+function diagnostic_0039(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0039',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0040: predation
+function diagnostic_0040(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0040',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0041: reproduction
+function diagnostic_0041(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0041',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0042: territory
+function diagnostic_0042(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0042',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0043: culture
+function diagnostic_0043(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0043',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0044: technology
+function diagnostic_0044(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0044',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0045: exploration
+function diagnostic_0045(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0045',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0046: water
+function diagnostic_0046(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0046',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0047: energy
+function diagnostic_0047(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0047',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0048: temperature
+function diagnostic_0048(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0048',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0049: predation
+function diagnostic_0049(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0049',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0050: reproduction
+function diagnostic_0050(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0050',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0051: territory
+function diagnostic_0051(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0051',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0052: culture
+function diagnostic_0052(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0052',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0053: technology
+function diagnostic_0053(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0053',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0054: exploration
+function diagnostic_0054(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0054',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0055: water
+function diagnostic_0055(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0055',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0056: energy
+function diagnostic_0056(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0056',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0057: temperature
+function diagnostic_0057(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0057',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0058: predation
+function diagnostic_0058(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0058',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0059: reproduction
+function diagnostic_0059(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0059',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0060: territory
+function diagnostic_0060(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0060',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0061: culture
+function diagnostic_0061(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0061',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0062: technology
+function diagnostic_0062(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0062',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0063: exploration
+function diagnostic_0063(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0063',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0064: water
+function diagnostic_0064(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0064',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0065: energy
+function diagnostic_0065(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0065',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0066: temperature
+function diagnostic_0066(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0066',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0067: predation
+function diagnostic_0067(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0067',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0068: reproduction
+function diagnostic_0068(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0068',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0069: territory
+function diagnostic_0069(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0069',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0070: culture
+function diagnostic_0070(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0070',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0071: technology
+function diagnostic_0071(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0071',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0072: exploration
+function diagnostic_0072(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0072',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0073: water
+function diagnostic_0073(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0073',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0074: energy
+function diagnostic_0074(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0074',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0075: temperature
+function diagnostic_0075(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0075',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0076: predation
+function diagnostic_0076(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0076',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0077: reproduction
+function diagnostic_0077(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0077',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0078: territory
+function diagnostic_0078(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0078',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0079: culture
+function diagnostic_0079(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0079',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0080: technology
+function diagnostic_0080(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0080',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0081: exploration
+function diagnostic_0081(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0081',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0082: water
+function diagnostic_0082(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0082',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0083: energy
+function diagnostic_0083(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0083',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0084: temperature
+function diagnostic_0084(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0084',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0085: predation
+function diagnostic_0085(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0085',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0086: reproduction
+function diagnostic_0086(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0086',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0087: territory
+function diagnostic_0087(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0087',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0088: culture
+function diagnostic_0088(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0088',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0089: technology
+function diagnostic_0089(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0089',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0090: exploration
+function diagnostic_0090(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0090',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0091: water
+function diagnostic_0091(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0091',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0092: energy
+function diagnostic_0092(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0092',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0093: temperature
+function diagnostic_0093(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0093',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0094: predation
+function diagnostic_0094(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0094',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0095: reproduction
+function diagnostic_0095(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0095',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0096: territory
+function diagnostic_0096(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0096',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0097: culture
+function diagnostic_0097(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0097',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0098: technology
+function diagnostic_0098(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0098',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0099: exploration
+function diagnostic_0099(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0099',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0100: water
+function diagnostic_0100(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0100',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0101: energy
+function diagnostic_0101(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0101',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0102: temperature
+function diagnostic_0102(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0102',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0103: predation
+function diagnostic_0103(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0103',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0104: reproduction
+function diagnostic_0104(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0104',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0105: territory
+function diagnostic_0105(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0105',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0106: culture
+function diagnostic_0106(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0106',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0107: technology
+function diagnostic_0107(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0107',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0108: exploration
+function diagnostic_0108(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0108',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0109: water
+function diagnostic_0109(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0109',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0110: energy
+function diagnostic_0110(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0110',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0111: temperature
+function diagnostic_0111(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0111',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0112: predation
+function diagnostic_0112(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0112',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0113: reproduction
+function diagnostic_0113(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0113',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0114: territory
+function diagnostic_0114(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0114',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0115: culture
+function diagnostic_0115(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0115',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0116: technology
+function diagnostic_0116(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0116',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0117: exploration
+function diagnostic_0117(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0117',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0118: water
+function diagnostic_0118(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0118',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0119: energy
+function diagnostic_0119(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0119',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0120: temperature
+function diagnostic_0120(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0120',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0121: predation
+function diagnostic_0121(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0121',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0122: reproduction
+function diagnostic_0122(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0122',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0123: territory
+function diagnostic_0123(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0123',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0124: culture
+function diagnostic_0124(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0124',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0125: technology
+function diagnostic_0125(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0125',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0126: exploration
+function diagnostic_0126(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0126',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0127: water
+function diagnostic_0127(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0127',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0128: energy
+function diagnostic_0128(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0128',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0129: temperature
+function diagnostic_0129(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0129',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0130: predation
+function diagnostic_0130(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0130',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0131: reproduction
+function diagnostic_0131(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0131',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0132: territory
+function diagnostic_0132(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0132',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0133: culture
+function diagnostic_0133(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0133',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0134: technology
+function diagnostic_0134(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0134',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0135: exploration
+function diagnostic_0135(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0135',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0136: water
+function diagnostic_0136(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0136',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0137: energy
+function diagnostic_0137(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0137',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0138: temperature
+function diagnostic_0138(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0138',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0139: predation
+function diagnostic_0139(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0139',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0140: reproduction
+function diagnostic_0140(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0140',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0141: territory
+function diagnostic_0141(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0141',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0142: culture
+function diagnostic_0142(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0142',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0143: technology
+function diagnostic_0143(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0143',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0144: exploration
+function diagnostic_0144(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0144',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0145: water
+function diagnostic_0145(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0145',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0146: energy
+function diagnostic_0146(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0146',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0147: temperature
+function diagnostic_0147(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0147',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0148: predation
+function diagnostic_0148(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0148',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0149: reproduction
+function diagnostic_0149(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0149',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0150: territory
+function diagnostic_0150(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0150',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0151: culture
+function diagnostic_0151(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0151',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0152: technology
+function diagnostic_0152(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0152',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0153: exploration
+function diagnostic_0153(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0153',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0154: water
+function diagnostic_0154(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0154',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0155: energy
+function diagnostic_0155(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0155',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0156: temperature
+function diagnostic_0156(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0156',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0157: predation
+function diagnostic_0157(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0157',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0158: reproduction
+function diagnostic_0158(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0158',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0159: territory
+function diagnostic_0159(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0159',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0160: culture
+function diagnostic_0160(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0160',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0161: technology
+function diagnostic_0161(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0161',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0162: exploration
+function diagnostic_0162(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0162',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0163: water
+function diagnostic_0163(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0163',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0164: energy
+function diagnostic_0164(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0164',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0165: temperature
+function diagnostic_0165(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0165',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0166: predation
+function diagnostic_0166(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0166',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0167: reproduction
+function diagnostic_0167(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0167',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0168: territory
+function diagnostic_0168(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0168',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0169: culture
+function diagnostic_0169(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0169',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0170: technology
+function diagnostic_0170(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0170',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0171: exploration
+function diagnostic_0171(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0171',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0172: water
+function diagnostic_0172(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0172',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0173: energy
+function diagnostic_0173(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0173',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0174: temperature
+function diagnostic_0174(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0174',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0175: predation
+function diagnostic_0175(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0175',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0176: reproduction
+function diagnostic_0176(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0176',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0177: territory
+function diagnostic_0177(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0177',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0178: culture
+function diagnostic_0178(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0178',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0179: technology
+function diagnostic_0179(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0179',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0180: exploration
+function diagnostic_0180(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0180',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0181: water
+function diagnostic_0181(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0181',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0182: energy
+function diagnostic_0182(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0182',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0183: temperature
+function diagnostic_0183(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0183',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0184: predation
+function diagnostic_0184(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0184',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0185: reproduction
+function diagnostic_0185(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0185',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0186: territory
+function diagnostic_0186(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0186',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0187: culture
+function diagnostic_0187(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0187',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0188: technology
+function diagnostic_0188(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0188',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0189: exploration
+function diagnostic_0189(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0189',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0190: water
+function diagnostic_0190(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0190',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0191: energy
+function diagnostic_0191(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0191',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0192: temperature
+function diagnostic_0192(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0192',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0193: predation
+function diagnostic_0193(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0193',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0194: reproduction
+function diagnostic_0194(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0194',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0195: territory
+function diagnostic_0195(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0195',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0196: culture
+function diagnostic_0196(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0196',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0197: technology
+function diagnostic_0197(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0197',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0198: exploration
+function diagnostic_0198(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0198',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0199: water
+function diagnostic_0199(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0199',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0200: energy
+function diagnostic_0200(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0200',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0201: temperature
+function diagnostic_0201(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0201',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0202: predation
+function diagnostic_0202(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0202',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0203: reproduction
+function diagnostic_0203(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0203',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0204: territory
+function diagnostic_0204(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0204',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0205: culture
+function diagnostic_0205(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0205',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0206: technology
+function diagnostic_0206(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0206',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0207: exploration
+function diagnostic_0207(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0207',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0208: water
+function diagnostic_0208(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0208',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0209: energy
+function diagnostic_0209(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0209',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0210: temperature
+function diagnostic_0210(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0210',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0211: predation
+function diagnostic_0211(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0211',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0212: reproduction
+function diagnostic_0212(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0212',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0213: territory
+function diagnostic_0213(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0213',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0214: culture
+function diagnostic_0214(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0214',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0215: technology
+function diagnostic_0215(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0215',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0216: exploration
+function diagnostic_0216(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0216',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0217: water
+function diagnostic_0217(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0217',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0218: energy
+function diagnostic_0218(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0218',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0219: temperature
+function diagnostic_0219(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0219',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0220: predation
+function diagnostic_0220(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0220',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0221: reproduction
+function diagnostic_0221(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0221',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0222: territory
+function diagnostic_0222(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0222',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0223: culture
+function diagnostic_0223(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0223',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0224: technology
+function diagnostic_0224(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0224',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0225: exploration
+function diagnostic_0225(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0225',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0226: water
+function diagnostic_0226(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0226',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0227: energy
+function diagnostic_0227(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0227',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0228: temperature
+function diagnostic_0228(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0228',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0229: predation
+function diagnostic_0229(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0229',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0230: reproduction
+function diagnostic_0230(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0230',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0231: territory
+function diagnostic_0231(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0231',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0232: culture
+function diagnostic_0232(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0232',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0233: technology
+function diagnostic_0233(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0233',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0234: exploration
+function diagnostic_0234(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0234',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0235: water
+function diagnostic_0235(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0235',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0236: energy
+function diagnostic_0236(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0236',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0237: temperature
+function diagnostic_0237(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0237',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0238: predation
+function diagnostic_0238(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0238',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0239: reproduction
+function diagnostic_0239(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0239',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0240: territory
+function diagnostic_0240(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0240',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0241: culture
+function diagnostic_0241(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0241',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0242: technology
+function diagnostic_0242(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0242',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0243: exploration
+function diagnostic_0243(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0243',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0244: water
+function diagnostic_0244(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0244',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0245: energy
+function diagnostic_0245(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0245',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0246: temperature
+function diagnostic_0246(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0246',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0247: predation
+function diagnostic_0247(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0247',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0248: reproduction
+function diagnostic_0248(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0248',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0249: territory
+function diagnostic_0249(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0249',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0250: culture
+function diagnostic_0250(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0250',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0251: technology
+function diagnostic_0251(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0251',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0252: exploration
+function diagnostic_0252(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0252',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0253: water
+function diagnostic_0253(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0253',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0254: energy
+function diagnostic_0254(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0254',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0255: temperature
+function diagnostic_0255(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0255',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0256: predation
+function diagnostic_0256(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0256',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0257: reproduction
+function diagnostic_0257(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0257',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0258: territory
+function diagnostic_0258(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0258',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0259: culture
+function diagnostic_0259(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0259',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0260: technology
+function diagnostic_0260(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0260',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0261: exploration
+function diagnostic_0261(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0261',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0262: water
+function diagnostic_0262(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0262',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0263: energy
+function diagnostic_0263(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0263',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0264: temperature
+function diagnostic_0264(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0264',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0265: predation
+function diagnostic_0265(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0265',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0266: reproduction
+function diagnostic_0266(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0266',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0267: territory
+function diagnostic_0267(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0267',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0268: culture
+function diagnostic_0268(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0268',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0269: technology
+function diagnostic_0269(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0269',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0270: exploration
+function diagnostic_0270(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0270',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0271: water
+function diagnostic_0271(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0271',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0272: energy
+function diagnostic_0272(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0272',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0273: temperature
+function diagnostic_0273(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0273',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0274: predation
+function diagnostic_0274(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0274',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0275: reproduction
+function diagnostic_0275(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0275',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0276: territory
+function diagnostic_0276(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0276',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0277: culture
+function diagnostic_0277(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0277',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0278: technology
+function diagnostic_0278(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0278',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0279: exploration
+function diagnostic_0279(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0279',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0280: water
+function diagnostic_0280(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0280',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0281: energy
+function diagnostic_0281(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0281',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0282: temperature
+function diagnostic_0282(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0282',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0283: predation
+function diagnostic_0283(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0283',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0284: reproduction
+function diagnostic_0284(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0284',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0285: territory
+function diagnostic_0285(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0285',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0286: culture
+function diagnostic_0286(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0286',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0287: technology
+function diagnostic_0287(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0287',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0288: exploration
+function diagnostic_0288(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0288',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0289: water
+function diagnostic_0289(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0289',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0290: energy
+function diagnostic_0290(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0290',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0291: temperature
+function diagnostic_0291(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0291',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0292: predation
+function diagnostic_0292(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0292',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0293: reproduction
+function diagnostic_0293(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0293',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0294: territory
+function diagnostic_0294(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0294',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0295: culture
+function diagnostic_0295(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0295',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0296: technology
+function diagnostic_0296(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0296',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0297: exploration
+function diagnostic_0297(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0297',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0298: water
+function diagnostic_0298(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0298',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0299: energy
+function diagnostic_0299(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0299',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0300: temperature
+function diagnostic_0300(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0300',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0301: predation
+function diagnostic_0301(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0301',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0302: reproduction
+function diagnostic_0302(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0302',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0303: territory
+function diagnostic_0303(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0303',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0304: culture
+function diagnostic_0304(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0304',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0305: technology
+function diagnostic_0305(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0305',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0306: exploration
+function diagnostic_0306(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0306',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0307: water
+function diagnostic_0307(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0307',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0308: energy
+function diagnostic_0308(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0308',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0309: temperature
+function diagnostic_0309(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0309',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0310: predation
+function diagnostic_0310(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0310',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0311: reproduction
+function diagnostic_0311(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0311',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0312: territory
+function diagnostic_0312(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0312',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0313: culture
+function diagnostic_0313(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0313',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0314: technology
+function diagnostic_0314(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0314',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0315: exploration
+function diagnostic_0315(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0315',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0316: water
+function diagnostic_0316(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0316',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0317: energy
+function diagnostic_0317(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0317',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0318: temperature
+function diagnostic_0318(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0318',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0319: predation
+function diagnostic_0319(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0319',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0320: reproduction
+function diagnostic_0320(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0320',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0321: territory
+function diagnostic_0321(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0321',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0322: culture
+function diagnostic_0322(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0322',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0323: technology
+function diagnostic_0323(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0323',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0324: exploration
+function diagnostic_0324(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0324',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0325: water
+function diagnostic_0325(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0325',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0326: energy
+function diagnostic_0326(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0326',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0327: temperature
+function diagnostic_0327(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0327',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0328: predation
+function diagnostic_0328(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0328',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0329: reproduction
+function diagnostic_0329(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0329',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0330: territory
+function diagnostic_0330(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0330',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0331: culture
+function diagnostic_0331(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0331',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0332: technology
+function diagnostic_0332(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0332',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0333: exploration
+function diagnostic_0333(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0333',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0334: water
+function diagnostic_0334(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0334',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0335: energy
+function diagnostic_0335(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0335',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0336: temperature
+function diagnostic_0336(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0336',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0337: predation
+function diagnostic_0337(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0337',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0338: reproduction
+function diagnostic_0338(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0338',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0339: territory
+function diagnostic_0339(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0339',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0340: culture
+function diagnostic_0340(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0340',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0341: technology
+function diagnostic_0341(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0341',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0342: exploration
+function diagnostic_0342(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0342',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0343: water
+function diagnostic_0343(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0343',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0344: energy
+function diagnostic_0344(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0344',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0345: temperature
+function diagnostic_0345(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0345',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0346: predation
+function diagnostic_0346(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0346',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0347: reproduction
+function diagnostic_0347(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0347',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0348: territory
+function diagnostic_0348(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0348',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0349: culture
+function diagnostic_0349(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0349',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0350: technology
+function diagnostic_0350(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0350',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0351: exploration
+function diagnostic_0351(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0351',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0352: water
+function diagnostic_0352(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0352',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0353: energy
+function diagnostic_0353(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0353',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0354: temperature
+function diagnostic_0354(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0354',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0355: predation
+function diagnostic_0355(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0355',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0356: reproduction
+function diagnostic_0356(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0356',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0357: territory
+function diagnostic_0357(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0357',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0358: culture
+function diagnostic_0358(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0358',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0359: technology
+function diagnostic_0359(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0359',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0360: exploration
+function diagnostic_0360(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0360',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0361: water
+function diagnostic_0361(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0361',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0362: energy
+function diagnostic_0362(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0362',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0363: temperature
+function diagnostic_0363(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0363',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0364: predation
+function diagnostic_0364(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0364',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0365: reproduction
+function diagnostic_0365(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0365',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0366: territory
+function diagnostic_0366(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0366',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0367: culture
+function diagnostic_0367(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0367',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0368: technology
+function diagnostic_0368(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0368',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0369: exploration
+function diagnostic_0369(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0369',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0370: water
+function diagnostic_0370(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0370',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0371: energy
+function diagnostic_0371(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0371',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0372: temperature
+function diagnostic_0372(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0372',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0373: predation
+function diagnostic_0373(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0373',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0374: reproduction
+function diagnostic_0374(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0374',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0375: territory
+function diagnostic_0375(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0375',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0376: culture
+function diagnostic_0376(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0376',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0377: technology
+function diagnostic_0377(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0377',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0378: exploration
+function diagnostic_0378(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0378',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0379: water
+function diagnostic_0379(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0379',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0380: energy
+function diagnostic_0380(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0380',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0381: temperature
+function diagnostic_0381(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0381',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0382: predation
+function diagnostic_0382(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0382',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0383: reproduction
+function diagnostic_0383(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0383',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0384: territory
+function diagnostic_0384(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0384',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0385: culture
+function diagnostic_0385(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0385',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0386: technology
+function diagnostic_0386(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0386',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0387: exploration
+function diagnostic_0387(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0387',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0388: water
+function diagnostic_0388(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0388',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0389: energy
+function diagnostic_0389(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0389',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0390: temperature
+function diagnostic_0390(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0390',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0391: predation
+function diagnostic_0391(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0391',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0392: reproduction
+function diagnostic_0392(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0392',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0393: territory
+function diagnostic_0393(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0393',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0394: culture
+function diagnostic_0394(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0394',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0395: technology
+function diagnostic_0395(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0395',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0396: exploration
+function diagnostic_0396(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0396',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0397: water
+function diagnostic_0397(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0397',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0398: energy
+function diagnostic_0398(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0398',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0399: temperature
+function diagnostic_0399(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0399',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0400: predation
+function diagnostic_0400(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0400',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0401: reproduction
+function diagnostic_0401(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0401',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0402: territory
+function diagnostic_0402(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0402',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0403: culture
+function diagnostic_0403(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0403',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0404: technology
+function diagnostic_0404(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0404',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0405: exploration
+function diagnostic_0405(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0405',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0406: water
+function diagnostic_0406(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0406',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0407: energy
+function diagnostic_0407(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0407',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0408: temperature
+function diagnostic_0408(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0408',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0409: predation
+function diagnostic_0409(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0409',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0410: reproduction
+function diagnostic_0410(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0410',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0411: territory
+function diagnostic_0411(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0411',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0412: culture
+function diagnostic_0412(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0412',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0413: technology
+function diagnostic_0413(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0413',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0414: exploration
+function diagnostic_0414(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0414',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0415: water
+function diagnostic_0415(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0415',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0416: energy
+function diagnostic_0416(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0416',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0417: temperature
+function diagnostic_0417(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0417',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0418: predation
+function diagnostic_0418(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0418',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0419: reproduction
+function diagnostic_0419(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0419',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0420: territory
+function diagnostic_0420(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0420',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0421: culture
+function diagnostic_0421(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0421',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0422: technology
+function diagnostic_0422(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0422',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0423: exploration
+function diagnostic_0423(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0423',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0424: water
+function diagnostic_0424(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0424',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0425: energy
+function diagnostic_0425(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0425',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0426: temperature
+function diagnostic_0426(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0426',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0427: predation
+function diagnostic_0427(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0427',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0428: reproduction
+function diagnostic_0428(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0428',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0429: territory
+function diagnostic_0429(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0429',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0430: culture
+function diagnostic_0430(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0430',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0431: technology
+function diagnostic_0431(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0431',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0432: exploration
+function diagnostic_0432(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0432',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0433: water
+function diagnostic_0433(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0433',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0434: energy
+function diagnostic_0434(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0434',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0435: temperature
+function diagnostic_0435(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0435',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0436: predation
+function diagnostic_0436(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0436',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0437: reproduction
+function diagnostic_0437(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0437',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0438: territory
+function diagnostic_0438(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0438',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0439: culture
+function diagnostic_0439(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0439',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0440: technology
+function diagnostic_0440(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0440',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0441: exploration
+function diagnostic_0441(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0441',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0442: water
+function diagnostic_0442(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0442',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0443: energy
+function diagnostic_0443(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0443',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0444: temperature
+function diagnostic_0444(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0444',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0445: predation
+function diagnostic_0445(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0445',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0446: reproduction
+function diagnostic_0446(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0446',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0447: territory
+function diagnostic_0447(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0447',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0448: culture
+function diagnostic_0448(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0448',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0449: technology
+function diagnostic_0449(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0449',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0450: exploration
+function diagnostic_0450(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0450',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0451: water
+function diagnostic_0451(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0451',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0452: energy
+function diagnostic_0452(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0452',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0453: temperature
+function diagnostic_0453(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0453',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0454: predation
+function diagnostic_0454(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0454',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0455: reproduction
+function diagnostic_0455(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0455',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0456: territory
+function diagnostic_0456(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0456',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0457: culture
+function diagnostic_0457(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0457',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0458: technology
+function diagnostic_0458(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0458',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0459: exploration
+function diagnostic_0459(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0459',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0460: water
+function diagnostic_0460(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0460',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0461: energy
+function diagnostic_0461(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0461',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0462: temperature
+function diagnostic_0462(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0462',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0463: predation
+function diagnostic_0463(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0463',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0464: reproduction
+function diagnostic_0464(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0464',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0465: territory
+function diagnostic_0465(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0465',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0466: culture
+function diagnostic_0466(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0466',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0467: technology
+function diagnostic_0467(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0467',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0468: exploration
+function diagnostic_0468(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0468',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0469: water
+function diagnostic_0469(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0469',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0470: energy
+function diagnostic_0470(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0470',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0471: temperature
+function diagnostic_0471(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0471',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0472: predation
+function diagnostic_0472(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0472',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0473: reproduction
+function diagnostic_0473(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0473',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0474: territory
+function diagnostic_0474(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0474',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0475: culture
+function diagnostic_0475(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0475',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0476: technology
+function diagnostic_0476(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0476',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0477: exploration
+function diagnostic_0477(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0477',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0478: water
+function diagnostic_0478(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0478',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0479: energy
+function diagnostic_0479(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0479',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0480: temperature
+function diagnostic_0480(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0480',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0481: predation
+function diagnostic_0481(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0481',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0482: reproduction
+function diagnostic_0482(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0482',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0483: territory
+function diagnostic_0483(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0483',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0484: culture
+function diagnostic_0484(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0484',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0485: technology
+function diagnostic_0485(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0485',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0486: exploration
+function diagnostic_0486(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0486',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0487: water
+function diagnostic_0487(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0487',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0488: energy
+function diagnostic_0488(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0488',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0489: temperature
+function diagnostic_0489(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0489',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0490: predation
+function diagnostic_0490(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0490',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0491: reproduction
+function diagnostic_0491(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0491',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0492: territory
+function diagnostic_0492(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0492',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0493: culture
+function diagnostic_0493(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0493',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0494: technology
+function diagnostic_0494(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0494',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0495: exploration
+function diagnostic_0495(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0495',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0496: water
+function diagnostic_0496(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0496',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0497: energy
+function diagnostic_0497(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0497',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0498: temperature
+function diagnostic_0498(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0498',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0499: predation
+function diagnostic_0499(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0499',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0500: reproduction
+function diagnostic_0500(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0500',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0501: territory
+function diagnostic_0501(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0501',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0502: culture
+function diagnostic_0502(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0502',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0503: technology
+function diagnostic_0503(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0503',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0504: exploration
+function diagnostic_0504(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0504',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0505: water
+function diagnostic_0505(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0505',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0506: energy
+function diagnostic_0506(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0506',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0507: temperature
+function diagnostic_0507(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0507',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0508: predation
+function diagnostic_0508(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0508',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0509: reproduction
+function diagnostic_0509(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0509',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0510: territory
+function diagnostic_0510(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0510',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0511: culture
+function diagnostic_0511(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0511',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0512: technology
+function diagnostic_0512(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0512',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0513: exploration
+function diagnostic_0513(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0513',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0514: water
+function diagnostic_0514(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0514',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0515: energy
+function diagnostic_0515(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0515',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0516: temperature
+function diagnostic_0516(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0516',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0517: predation
+function diagnostic_0517(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0517',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0518: reproduction
+function diagnostic_0518(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0518',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0519: territory
+function diagnostic_0519(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0519',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0520: culture
+function diagnostic_0520(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0520',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0521: technology
+function diagnostic_0521(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0521',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0522: exploration
+function diagnostic_0522(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0522',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0523: water
+function diagnostic_0523(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0523',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0524: energy
+function diagnostic_0524(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0524',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0525: temperature
+function diagnostic_0525(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0525',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0526: predation
+function diagnostic_0526(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0526',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0527: reproduction
+function diagnostic_0527(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0527',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0528: territory
+function diagnostic_0528(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0528',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0529: culture
+function diagnostic_0529(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0529',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0530: technology
+function diagnostic_0530(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0530',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0531: exploration
+function diagnostic_0531(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0531',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0532: water
+function diagnostic_0532(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0532',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0533: energy
+function diagnostic_0533(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0533',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0534: temperature
+function diagnostic_0534(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0534',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0535: predation
+function diagnostic_0535(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0535',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0536: reproduction
+function diagnostic_0536(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0536',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0537: territory
+function diagnostic_0537(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0537',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0538: culture
+function diagnostic_0538(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0538',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0539: technology
+function diagnostic_0539(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0539',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0540: exploration
+function diagnostic_0540(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0540',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0541: water
+function diagnostic_0541(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0541',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0542: energy
+function diagnostic_0542(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0542',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0543: temperature
+function diagnostic_0543(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0543',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0544: predation
+function diagnostic_0544(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0544',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0545: reproduction
+function diagnostic_0545(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0545',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0546: territory
+function diagnostic_0546(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0546',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0547: culture
+function diagnostic_0547(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0547',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0548: technology
+function diagnostic_0548(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0548',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0549: exploration
+function diagnostic_0549(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0549',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0550: water
+function diagnostic_0550(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0550',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0551: energy
+function diagnostic_0551(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0551',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0552: temperature
+function diagnostic_0552(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0552',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0553: predation
+function diagnostic_0553(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0553',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0554: reproduction
+function diagnostic_0554(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0554',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0555: territory
+function diagnostic_0555(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0555',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0556: culture
+function diagnostic_0556(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0556',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0557: technology
+function diagnostic_0557(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0557',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0558: exploration
+function diagnostic_0558(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0558',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0559: water
+function diagnostic_0559(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0559',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0560: energy
+function diagnostic_0560(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0560',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0561: temperature
+function diagnostic_0561(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0561',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0562: predation
+function diagnostic_0562(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0562',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0563: reproduction
+function diagnostic_0563(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0563',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0564: territory
+function diagnostic_0564(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0564',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0565: culture
+function diagnostic_0565(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0565',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0566: technology
+function diagnostic_0566(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0566',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0567: exploration
+function diagnostic_0567(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0567',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0568: water
+function diagnostic_0568(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0568',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0569: energy
+function diagnostic_0569(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0569',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0570: temperature
+function diagnostic_0570(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0570',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0571: predation
+function diagnostic_0571(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0571',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0572: reproduction
+function diagnostic_0572(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0572',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0573: territory
+function diagnostic_0573(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0573',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0574: culture
+function diagnostic_0574(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0574',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0575: technology
+function diagnostic_0575(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0575',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0576: exploration
+function diagnostic_0576(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0576',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0577: water
+function diagnostic_0577(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0577',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0578: energy
+function diagnostic_0578(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0578',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0579: temperature
+function diagnostic_0579(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0579',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0580: predation
+function diagnostic_0580(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0580',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0581: reproduction
+function diagnostic_0581(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0581',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0582: territory
+function diagnostic_0582(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0582',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0583: culture
+function diagnostic_0583(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0583',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0584: technology
+function diagnostic_0584(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0584',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0585: exploration
+function diagnostic_0585(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0585',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0586: water
+function diagnostic_0586(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0586',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0587: energy
+function diagnostic_0587(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0587',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0588: temperature
+function diagnostic_0588(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0588',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0589: predation
+function diagnostic_0589(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0589',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0590: reproduction
+function diagnostic_0590(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0590',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0591: territory
+function diagnostic_0591(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0591',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0592: culture
+function diagnostic_0592(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0592',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0593: technology
+function diagnostic_0593(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0593',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0594: exploration
+function diagnostic_0594(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0594',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0595: water
+function diagnostic_0595(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0595',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0596: energy
+function diagnostic_0596(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0596',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0597: temperature
+function diagnostic_0597(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0597',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0598: predation
+function diagnostic_0598(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0598',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0599: reproduction
+function diagnostic_0599(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0599',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0600: territory
+function diagnostic_0600(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0600',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0601: culture
+function diagnostic_0601(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0601',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0602: technology
+function diagnostic_0602(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0602',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0603: exploration
+function diagnostic_0603(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0603',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0604: water
+function diagnostic_0604(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0604',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0605: energy
+function diagnostic_0605(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0605',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0606: temperature
+function diagnostic_0606(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0606',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0607: predation
+function diagnostic_0607(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0607',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0608: reproduction
+function diagnostic_0608(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0608',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0609: territory
+function diagnostic_0609(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0609',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0610: culture
+function diagnostic_0610(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0610',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0611: technology
+function diagnostic_0611(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0611',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0612: exploration
+function diagnostic_0612(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0612',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0613: water
+function diagnostic_0613(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0613',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0614: energy
+function diagnostic_0614(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0614',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0615: temperature
+function diagnostic_0615(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0615',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0616: predation
+function diagnostic_0616(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0616',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0617: reproduction
+function diagnostic_0617(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0617',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0618: territory
+function diagnostic_0618(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0618',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0619: culture
+function diagnostic_0619(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0619',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0620: technology
+function diagnostic_0620(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0620',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0621: exploration
+function diagnostic_0621(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0621',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0622: water
+function diagnostic_0622(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0622',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0623: energy
+function diagnostic_0623(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0623',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0624: temperature
+function diagnostic_0624(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0624',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0625: predation
+function diagnostic_0625(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0625',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0626: reproduction
+function diagnostic_0626(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0626',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0627: territory
+function diagnostic_0627(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0627',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0628: culture
+function diagnostic_0628(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0628',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0629: technology
+function diagnostic_0629(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0629',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0630: exploration
+function diagnostic_0630(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0630',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0631: water
+function diagnostic_0631(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0631',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0632: energy
+function diagnostic_0632(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0632',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0633: temperature
+function diagnostic_0633(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0633',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0634: predation
+function diagnostic_0634(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0634',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0635: reproduction
+function diagnostic_0635(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0635',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0636: territory
+function diagnostic_0636(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0636',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0637: culture
+function diagnostic_0637(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0637',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0638: technology
+function diagnostic_0638(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0638',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0639: exploration
+function diagnostic_0639(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0639',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0640: water
+function diagnostic_0640(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0640',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0641: energy
+function diagnostic_0641(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0641',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0642: temperature
+function diagnostic_0642(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0642',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0643: predation
+function diagnostic_0643(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0643',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0644: reproduction
+function diagnostic_0644(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0644',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0645: territory
+function diagnostic_0645(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0645',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0646: culture
+function diagnostic_0646(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0646',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0647: technology
+function diagnostic_0647(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0647',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0648: exploration
+function diagnostic_0648(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0648',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0649: water
+function diagnostic_0649(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0649',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0650: energy
+function diagnostic_0650(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0650',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0651: temperature
+function diagnostic_0651(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0651',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0652: predation
+function diagnostic_0652(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0652',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0653: reproduction
+function diagnostic_0653(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0653',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0654: territory
+function diagnostic_0654(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0654',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0655: culture
+function diagnostic_0655(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0655',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0656: technology
+function diagnostic_0656(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0656',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0657: exploration
+function diagnostic_0657(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0657',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0658: water
+function diagnostic_0658(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0658',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0659: energy
+function diagnostic_0659(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0659',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0660: temperature
+function diagnostic_0660(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0660',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0661: predation
+function diagnostic_0661(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0661',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0662: reproduction
+function diagnostic_0662(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0662',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0663: territory
+function diagnostic_0663(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0663',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0664: culture
+function diagnostic_0664(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0664',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0665: technology
+function diagnostic_0665(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0665',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0666: exploration
+function diagnostic_0666(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0666',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0667: water
+function diagnostic_0667(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0667',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0668: energy
+function diagnostic_0668(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0668',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0669: temperature
+function diagnostic_0669(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0669',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0670: predation
+function diagnostic_0670(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0670',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0671: reproduction
+function diagnostic_0671(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0671',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0672: territory
+function diagnostic_0672(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0672',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0673: culture
+function diagnostic_0673(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0673',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0674: technology
+function diagnostic_0674(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0674',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0675: exploration
+function diagnostic_0675(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0675',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0676: water
+function diagnostic_0676(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0676',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0677: energy
+function diagnostic_0677(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0677',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0678: temperature
+function diagnostic_0678(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0678',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0679: predation
+function diagnostic_0679(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0679',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0680: reproduction
+function diagnostic_0680(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0680',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0681: territory
+function diagnostic_0681(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0681',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0682: culture
+function diagnostic_0682(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0682',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0683: technology
+function diagnostic_0683(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0683',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0684: exploration
+function diagnostic_0684(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0684',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0685: water
+function diagnostic_0685(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0685',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0686: energy
+function diagnostic_0686(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0686',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0687: temperature
+function diagnostic_0687(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0687',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0688: predation
+function diagnostic_0688(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0688',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0689: reproduction
+function diagnostic_0689(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0689',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0690: territory
+function diagnostic_0690(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(8+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0690',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0691: culture
+function diagnostic_0691(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(9+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0691',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0692: technology
+function diagnostic_0692(s={}){
+  const base=Number(s.technology||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(10+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0692',domain:'technology',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0693: exploration
+function diagnostic_0693(s={}){
+  const base=Number(s.exploration||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(0+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0693',domain:'exploration',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0694: water
+function diagnostic_0694(s={}){
+  const base=Number(s.water||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(1+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0694',domain:'water',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0695: energy
+function diagnostic_0695(s={}){
+  const base=Number(s.energy||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(2+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0695',domain:'energy',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0696: temperature
+function diagnostic_0696(s={}){
+  const base=Number(s.temperature||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(3+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0696',domain:'temperature',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0697: predation
+function diagnostic_0697(s={}){
+  const base=Number(s.predation||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(4+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0697',domain:'predation',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0698: reproduction
+function diagnostic_0698(s={}){
+  const base=Number(s.reproduction||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(5+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0698',domain:'reproduction',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0699: territory
+function diagnostic_0699(s={}){
+  const base=Number(s.territory||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(6+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0699',domain:'territory',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}
+// Diagnostic rule 0700: culture
+function diagnostic_0700(s={}){
+  const base=Number(s.culture||s.dna||s.population||0);
+  const habitat=Number(s.habitat||50);
+  const pressure=(7+1)*.17;
+  const score=Math.max(0,Math.min(100,Math.round(base+habitat*pressure)));
+  return {id:'diagnostic_0700',domain:'culture',score,signal:score>70?'favorável':score>40?'estável':'pressionado'};
+}

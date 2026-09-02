@@ -2,64 +2,157 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#06110e">
-  <meta name="description" content="Ecos do Brasil: Terra Invadida — jogo de ação 2D inspirado na resistência de Aimberê e na Confederação dos Tamoios.">
-  <title>Ecos do Brasil: Terra Invadida — V3</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#13251b">
+  <meta name="description" content="BioEvo: Brasil Nativo — evolução, sobrevivência e civilização em um ecossistema brasileiro.">
+  <title>BioEvo: Brasil Nativo</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main id="app" aria-label="Ecos do Brasil: Terra Invadida">
-    <canvas id="game" width="1600" height="900" tabindex="0" aria-label="Área do jogo"></canvas>
-
-    <section id="boot-screen" class="overlay boot-screen">
-      <div class="boot-card">
-        <div class="boot-symbol">◆</div>
-        <h1>ECOS DO BRASIL</h1>
-        <p>TERRA INVADIDA</p>
-        <div class="loading-track"><div id="loading-fill" class="loading-fill"></div></div>
-        <small id="loading-label">Preparando a mata...</small>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">🧬</div>
+        <div>
+          <h1>BioEvo</h1>
+          <span>Brasil Nativo</span>
+        </div>
       </div>
-    </section>
-
-    <section id="error-screen" class="overlay error-screen" hidden>
-      <div class="error-card">
-        <h2>O jogo encontrou um erro</h2>
-        <p id="error-message"></p>
-        <button id="reload-button" type="button">Recarregar</button>
+      <div class="top-actions">
+        <button id="btn-save" class="ui-btn">Salvar</button>
+        <button id="btn-load" class="ui-btn">Carregar</button>
+        <button id="btn-pause" class="ui-btn accent">Pausar</button>
       </div>
-    </section>
+    </header>
 
-    <div id="top-actions" class="top-actions" aria-label="Ações do jogo">
-      <button id="sound-button" type="button" aria-label="Ativar ou desativar som">Som</button>
-      <button id="fullscreen-button" type="button" aria-label="Entrar em tela cheia">Tela cheia</button>
+    <main class="game-shell">
+      <section class="canvas-wrap">
+        <canvas id="game" width="1280" height="720"></canvas>
+        <div id="toast" class="toast"></div>
+        <div id="loading" class="loading"><div class="spinner"></div><div>Gerando ecossistema...</div></div>
+        <div id="crosshair" class="crosshair"></div>
+        <div class="controls-hint">
+          <span><kbd>WASD</kbd> mover</span>
+          <span><kbd>E</kbd> interagir</span>
+          <span><kbd>Espaço</kbd> habilidade</span>
+          <span><kbd>1–5</kbd> ações</span>
+          <span><kbd>M</kbd> mapa</span>
+          <span><kbd>V</kbd> evolução</span>
+          <span><kbd>J</kbd> linhagem</span>
+          <span><kbd>B</kbd> construção</span>
+        </div>
+      </section>
+
+      <aside class="hud-side">
+        <section class="panel creature-panel">
+          <div class="panel-title">LINHAGEM ATUAL</div>
+          <div class="creature-card">
+            <canvas id="portrait" width="128" height="128"></canvas>
+            <div class="creature-meta">
+              <div id="species-name" class="species-name">Carijó</div>
+              <div id="species-type" class="muted">Terrestre • Geração 1</div>
+              <div class="bars">
+                <div class="bar-row"><span>Vida</span><div class="bar"><i id="bar-hp"></i></div><b id="txt-hp">100</b></div>
+                <div class="bar-row"><span>Energia</span><div class="bar"><i id="bar-energy"></i></div><b id="txt-energy">100</b></div>
+                <div class="bar-row"><span>Água</span><div class="bar"><i id="bar-water"></i></div><b id="txt-water">100</b></div>
+              </div>
+            </div>
+          </div>
+          <div class="stat-grid">
+            <div><span>Velocidade</span><b id="stat-speed">50</b></div>
+            <div><span>Defesa</span><b id="stat-defense">20</b></div>
+            <div><span>Salto</span><b id="stat-jump">20</b></div>
+            <div><span>Visão</span><b id="stat-vision">50</b></div>
+          </div>
+          <div class="resources-row">
+            <span>🧬 <b id="dna">0</b> DNA</span>
+            <span>🌱 <b id="biomass">0</b></span>
+            <span>🪨 <b id="stone">0</b></span>
+          </div>
+        </section>
+
+        <section class="panel objective-panel">
+          <div class="panel-title">OBJETIVO DA GERAÇÃO</div>
+          <div id="objective-title" class="objective-title">Sobreviva e encontre um parceiro</div>
+          <div id="objective-desc" class="muted objective-desc">Explore seu bioma, alimente-se e alcance a maturidade para reproduzir.</div>
+          <div class="progress"><i id="objective-progress"></i></div>
+        </section>
+
+        <section class="panel quick-panel">
+          <div class="panel-title">AÇÕES</div>
+          <div class="quick-grid">
+            <button data-action="eat">1<br><small>Comer</small></button>
+            <button data-action="call">2<br><small>Chamar</small></button>
+            <button data-action="dig">3<br><small>Escavar</small></button>
+            <button data-action="build">4<br><small>Construir</small></button>
+            <button data-action="attack">5<br><small>Atacar</small></button>
+          </div>
+        </section>
+
+        <section class="panel log-panel">
+          <div class="panel-title">ECOSSISTEMA</div>
+          <div id="event-log" class="event-log"></div>
+        </section>
+      </aside>
+    </main>
+
+    <div id="evolution-modal" class="modal hidden">
+      <div class="modal-card evolution-card">
+        <button class="modal-close" data-close="evolution-modal">×</button>
+        <div class="modal-title">EVO — EDITOR DE EVOLUÇÃO</div>
+        <div class="evo-layout">
+          <div class="evo-preview">
+            <canvas id="evo-portrait" width="320" height="320"></canvas>
+            <div class="dna-large">🧬 <span id="dna-large">0</span> DNA</div>
+          </div>
+          <div class="evo-options" id="evo-options"></div>
+        </div>
+      </div>
     </div>
 
-    <section id="touch-controls" class="touch-controls" aria-label="Controles de toque">
-      <div class="touch-left">
-        <button class="touch-button touch-dir" data-key="ArrowLeft" aria-label="Mover para esquerda">◀</button>
-        <button class="touch-button touch-dir" data-key="ArrowRight" aria-label="Mover para direita">▶</button>
-        <button class="touch-button touch-dir" data-key="ArrowDown" aria-label="Agachar ou nadar para baixo">▼</button>
+    <div id="lineage-modal" class="modal hidden">
+      <div class="modal-card lineage-card">
+        <button class="modal-close" data-close="lineage-modal">×</button>
+        <div class="modal-title">ÁRVORE EVOLUTIVA</div>
+        <div id="lineage-tree" class="lineage-tree"></div>
       </div>
-      <div class="touch-right">
-        <button class="touch-button touch-action jump" data-key="Space" aria-label="Pular">A</button>
-        <button class="touch-button touch-action attack" data-key="KeyJ" aria-label="Atacar">X</button>
-        <button class="touch-button touch-action bow" data-key="KeyK" aria-label="Usar arco">Y</button>
-        <button class="touch-button touch-action dash" data-key="ShiftLeft" aria-label="Esquivar">B</button>
-        <button class="touch-button touch-action interact" data-key="KeyE" aria-label="Interagir">E</button>
+    </div>
+
+    <div id="map-modal" class="modal hidden">
+      <div class="modal-card map-card">
+        <button class="modal-close" data-close="map-modal">×</button>
+        <div class="modal-title">MAPA DO BRASIL NATIVO</div>
+        <canvas id="map-canvas" width="900" height="540"></canvas>
+        <div id="map-legend" class="map-legend"></div>
       </div>
-    </section>
+    </div>
 
-    <noscript>Este jogo precisa de JavaScript ativado.</noscript>
-  </main>
+    <div id="build-modal" class="modal hidden">
+      <div class="modal-card build-card">
+        <button class="modal-close" data-close="build-modal">×</button>
+        <div class="modal-title">CONSTRUÇÃO</div>
+        <div id="build-options" class="build-options"></div>
+      </div>
+    </div>
 
-  <script src="config.js"></script>
-  <script src="assets.js"></script>
-  <script src="audio.js"></script>
-  <script src="story.js"></script>
-  <script src="levels.js"></script>
-  <script src="engine.js"></script>
-  <script src="v3.js"></script>
-  <script src="main.js"></script>
+    <div id="start-modal" class="modal start-screen">
+      <div class="modal-card start-card">
+        <div class="start-logo">🧬</div>
+        <div class="modal-title">BIOEVO: BRASIL NATIVO</div>
+        <p>Comece como uma criatura simples. Sobreviva, reproduza, evolua e deixe uma linhagem capaz de atravessar os biomas do Brasil.</p>
+        <div class="start-form">
+          <label>Nome da espécie</label>
+          <input id="input-species" value="Carijó" maxlength="18">
+          <label>Bioma inicial</label>
+          <div id="start-biomes" class="start-biomes"></div>
+        </div>
+        <button id="btn-start" class="start-btn">CRIAR ESPÉCIE</button>
+        <div class="start-note">Sem servidor • sem bibliotecas externas • pronto para GitHub Pages</div>
+      </div>
+    </div>
+  </div>
+  <script src="data.js"></script>
+  <script src="sprites.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>

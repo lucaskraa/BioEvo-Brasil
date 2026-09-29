@@ -389,7 +389,7 @@ EvolutionSystem.mutateChild=function(mother,father){
   return child;
 };
 EvolutionSystem.buy=function(id){const m=D.MUTATIONS.find(x=>x.id===id);if(!m||Game.species.dna<m.cost||Game.species.mutations.includes(id))return false;Game.species.dna-=m.cost;Game.species.mutations.push(id);for(const[k,v]of Object.entries(m.effect)){Game.species.genes[k]=(Game.species.genes[k]||0)+v;}Game.species.history.push('Adaptação adquirida: '+m.name);say('Evolução adquirida: '+m.name);return true;};
-PlayerSystem={};
+const PlayerSystem={};
 PlayerSystem.update=function(dt){
   const p=Game.player,g=Game.species.genes;if(!p||!p.alive)return;
   if(g.body==='plant'){

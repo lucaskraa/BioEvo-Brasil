@@ -86,61 +86,90 @@ RenderSystem.description="Draws a pixel-art scene with depth layers, weather, pa
 
 // ===== CELLSYSTEM =====
 const CellSystem={};
-CellSystem.description="Primeiro estágio da linhagem: uma célula simples coleta energia, DNA e escolhe as adaptações que definem os caminhos animal, vegetal e aquático.";
+CellSystem.description="Estágio celular amplo com cadeia alimentar, células autônomas, predadores, absorção e exploração em mapa microscópico grande.";
+CellSystem.WORLD_W=9200;
+CellSystem.WORLD_H=6200;
 CellSystem.mutations=[
-  {id:'flagellum',name:'Flagelo',branch:'neutral',cost:12,desc:'Um primeiro motor biológico. A célula ganha velocidade e controle.',effect:{mobility:18}},
-  {id:'membrane',name:'Membrana reforçada',branch:'neutral',cost:15,desc:'Suporta impactos, toxinas e mudanças bruscas no meio.',effect:{membrane:22}},
-  {id:'phagocytosis',name:'Fagocitose',branch:'animal',cost:18,desc:'Engole partículas e outras células. É a primeira grande tendência para uma linhagem animal.',effect:{animal:2,feeding:22}},
-  {id:'photosynthesis',name:'Fotossíntese primitiva',branch:'plant',cost:18,desc:'Passa a transformar luz em energia. Abre a tendência vegetal.',effect:{plant:2,photosynthesis:18}},
-  {id:'chemoreceptors',name:'Quimiorreceptores',branch:'neutral',cost:16,desc:'Percebe nutrientes e perigos próximos antes do contato.',effect:{sense:24}},
-  {id:'cilia',name:'Cílios motores',branch:'animal',cost:20,desc:'Movimento fino e rápido em ambientes aquáticos.',requires:['flagellum'],effect:{animal:1,mobility:20}},
-  {id:'vacuole',name:'Vacúolo de reserva',branch:'neutral',cost:22,desc:'Armazena mais água e energia para atravessar períodos ruins.',effect:{storage:28}},
-  {id:'chloroplasts',name:'Cloroplastos estáveis',branch:'plant',cost:25,desc:'A fotossíntese se torna eficiente e a linhagem vegetal ganha força.',requires:['photosynthesis'],effect:{plant:2,photosynthesis:28}},
-  {id:'toxin',name:'Toxina celular',branch:'animal',cost:25,desc:'Defesa química que também favorece estratégias predatórias.',requires:['phagocytosis'],effect:{animal:1,toxin:26}},
-  {id:'nucleus',name:'Núcleo complexo',branch:'neutral',cost:30,desc:'Organiza o material genético e permite saltos evolutivos maiores.',requiresCount:3,effect:{complexity:35}},
-  {id:'multicellular',name:'Multicelularidade',branch:'neutral',cost:45,desc:'Células passam a cooperar. A linhagem deixa o estágio microscópico.',requires:['nucleus'],requiresCount:5,final:true,effect:{complexity:60}}
+  {id:'flagellum',name:'Flagelo',branch:'neutral',cost:10,desc:'Mais velocidade para explorar o mundo microscópico.',effect:{mobility:18}},
+  {id:'membrane',name:'Membrana reforçada',branch:'neutral',cost:12,desc:'Mais resistência quando células maiores atacam.',effect:{membrane:22}},
+  {id:'phagocytosis',name:'Fagocitose',branch:'animal',cost:16,desc:'Engole células com tamanho mais próximo do seu e recebe mais energia ao caçar.',effect:{animal:2,feeding:24}},
+  {id:'photosynthesis',name:'Fotossíntese primitiva',branch:'plant',cost:16,desc:'Transforma luz em energia e abre a tendência vegetal.',effect:{plant:2,photosynthesis:20}},
+  {id:'chemoreceptors',name:'Quimiorreceptores',branch:'neutral',cost:14,desc:'Percebe alimento e ameaças a uma distância maior.',effect:{sense:24}},
+  {id:'cilia',name:'Cílios motores',branch:'animal',cost:18,desc:'Controle fino e aceleração na água.',requires:['flagellum'],effect:{animal:1,mobility:20}},
+  {id:'vacuole',name:'Vacúolo de reserva',branch:'neutral',cost:20,desc:'Guarda energia e água por mais tempo.',effect:{storage:28}},
+  {id:'chloroplasts',name:'Cloroplastos estáveis',branch:'plant',cost:22,desc:'A fotossíntese fica mais eficiente.',requires:['photosynthesis'],effect:{plant:2,photosynthesis:28}},
+  {id:'toxin',name:'Toxina celular',branch:'animal',cost:22,desc:'Dano químico contra células que encostam em você.',requires:['phagocytosis'],effect:{animal:1,toxin:26}},
+  {id:'nucleus',name:'Núcleo complexo',branch:'neutral',cost:28,desc:'Organiza o DNA e libera saltos evolutivos maiores.',requiresCount:3,effect:{complexity:35}},
+  {id:'multicellular',name:'Multicelularidade',branch:'neutral',cost:42,desc:'Células passam a cooperar e formam o primeiro organismo.',requires:['nucleus'],requiresCount:5,final:true,effect:{complexity:60}}
 ];
+CellSystem.biomeTheme=function(){
+  const themes={
+    amazonia:{water:'#0b3b46',glow:'#2b8c78'},
+    caatinga:{water:'#243b42',glow:'#a88a52'},
+    cerrado:{water:'#163f46',glow:'#7c9a58'},
+    mata:{water:'#123f45',glow:'#4f9b72'},
+    pantanal:{water:'#0d4454',glow:'#5aa8a7'},
+    pampa:{water:'#173d49',glow:'#79a07d'}
+  };
+  return themes[Game.selectedBiome]||themes.cerrado;
+};
 CellSystem.init=function(){
   Game.stage='cell';
   document.body.classList.add('cell-stage');
   Game.world={};
   Game.plants=[];Game.animals=[];Game.buildings=[];
-  const w=canvas.width,h=canvas.height;
+  const x=CellSystem.WORLD_W*.5,y=CellSystem.WORLD_H*.5;
   Game.cell={
-    x:w*.5,y:h*.5,radius:18,
-    hp:100,hpMax:100,energy:72,energyMax:100,water:100,waterMax:100,
+    x,y,radius:19,
+    hp:100,hpMax:100,energy:78,energyMax:100,water:100,waterMax:100,
     mobility:16,membrane:8,feeding:8,photosynthesis:0,sense:8,storage:0,toxin:0,complexity:0,
-    animal:0,plant:0,age:0,pulse:0,feedCooldown:0,
-    particles:[],hazards:[],absorbed:0
+    animal:0,plant:0,age:0,pulse:0,feedCooldown:0,hitCooldown:0,
+    camera:{x,y},particles:[],microbes:[],absorbed:0,cellsEaten:0,explored:new Set()
   };
-  Game.player={id:'cell_0',x:Game.cell.x,y:Game.cell.y,hp:100,energy:72,water:100,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
-  for(let i=0;i<95;i++)CellSystem.spawnParticle();
-  for(let i=0;i<12;i++)CellSystem.spawnHazard();
+  Game.player={id:'cell_0',x,y,hp:100,energy:78,water:100,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
+  for(let i=0;i<300;i++)CellSystem.spawnParticle();
+  for(let i=0;i<68;i++)CellSystem.spawnMicrobe(i<8?'small':null);
   Game.species.history.push('A primeira célula da linhagem surgiu em águas primitivas.');
   Game.lineage=[{id:'cell_origin',name:Game.species.name,generation:0,biome:'micro',parents:[],note:'Origem unicelular.'}];
   Game.discoveries=new Set();
   CellSystem.refreshObjective();
 };
-CellSystem.spawnParticle=function(){
-  if(!Game.cell)return;
-  const margin=24;
+CellSystem.spawnParticle=function(nearPlayer=false){
+  const cell=Game.cell;if(!cell)return;
   const roll=rand();
-  const type=roll<.54?'nutrient':roll<.78?'mineral':roll<.94?'light':'dna';
-  const colors={nutrient:'#e3a45b',mineral:'#6cc6c0',light:'#90d96d',dna:'#86a8ff'};
-  const values={nutrient:2,mineral:1,light:1,dna:5};
-  Game.cell.particles.push({
-    x:margin+rand()*Math.max(1,canvas.width-margin*2),
-    y:margin+rand()*Math.max(1,canvas.height-margin*2),
-    vx:(rand()-.5)*9,vy:(rand()-.5)*9,
-    r:type==='dna'?5:3+randi(0,3),type,color:colors[type],value:values[type]
-  });
+  const type=roll<.52?'nutrient':roll<.73?'mineral':roll<.93?'light':'dna';
+  const colors={nutrient:'#e9b867',mineral:'#6ecdc8',light:'#9cdf77',dna:'#91aaff'};
+  let x,y;
+  if(nearPlayer){
+    const a=rand()*Math.PI*2,d=180+rand()*900;
+    x=clamp(cell.x+Math.cos(a)*d,20,CellSystem.WORLD_W-20);
+    y=clamp(cell.y+Math.sin(a)*d,20,CellSystem.WORLD_H-20);
+  }else{
+    x=30+rand()*(CellSystem.WORLD_W-60);y=30+rand()*(CellSystem.WORLD_H-60);
+  }
+  cell.particles.push({x,y,vx:(rand()-.5)*16,vy:(rand()-.5)*16,r:type==='dna'?5:3+randi(0,3),type,color:colors[type],value:type==='dna'?5:2,phase:rand()*6.28});
 };
-CellSystem.spawnHazard=function(){
-  if(!Game.cell)return;
-  Game.cell.hazards.push({
-    x:30+rand()*Math.max(1,canvas.width-60),
-    y:30+rand()*Math.max(1,canvas.height-60),
-    vx:(rand()-.5)*14,vy:(rand()-.5)*14,r:5+randi(0,5),phase:rand()*6.28
+CellSystem.spawnMicrobe=function(sizeClass=null){
+  const cell=Game.cell;if(!cell)return;
+  let radius;
+  if(sizeClass==='small')radius=8+rand()*7;
+  else{
+    const roll=rand();
+    radius=roll<.36?8+rand()*9:roll<.72?16+rand()*10:roll<.93?27+rand()*11:39+rand()*13;
+  }
+  let x=40+rand()*(CellSystem.WORLD_W-80),y=40+rand()*(CellSystem.WORLD_H-80);
+  if(radius>cell.radius*1.15&&Math.hypot(x-cell.x,y-cell.y)<620){
+    const a=rand()*Math.PI*2,d=700+rand()*600;x=clamp(cell.x+Math.cos(a)*d,40,CellSystem.WORLD_W-40);y=clamp(cell.y+Math.sin(a)*d,40,CellSystem.WORLD_H-40);
+  }
+  const palette=['#d06d78','#d49a62','#72b68b','#7aa5c8','#9a7bc5','#63b8ae','#b56b9a'];
+  const color=pick(palette);
+  const photosynthetic=rand()<.18;
+  const aggressive=radius>22?(.45+rand()*.5):(.08+rand()*.38);
+  cell.microbes.push({
+    id:'micro_'+Math.random().toString(36).slice(2),x,y,radius,color:photosynthetic?'#73b970':color,
+    vx:(rand()-.5)*30,vy:(rand()-.5)*30,angle:rand()*Math.PI*2,turn:rand()*2,pulse:rand()*6.28,
+    speed:48+rand()*58-Math.max(0,radius-20)*.75,aggressive,photosynthetic,toxin:rand()<.12,
+    nucleus:rand()<.42,flagella:rand()<.48,hp:radius*4,maxHp:radius*4,cooldown:0,state:'wander'
   });
 };
 CellSystem.path=function(){
@@ -155,7 +184,7 @@ CellSystem.canBuy=function(m){
   if(owned.includes(m.id))return {ok:false,reason:'Adquirida'};
   if(Game.species.dna<m.cost)return {ok:false,reason:'DNA insuficiente'};
   if(m.requires&&m.requires.some(id=>!owned.includes(id)))return {ok:false,reason:'Falta: '+m.requires.map(id=>CellSystem.mutations.find(x=>x.id===id)?.name||id).join(', ')};
-  if(m.requiresCount&&owned.filter(id=>CellSystem.mutations.some(x=>x.id===id&&x.id!=='multicellular')).length<m.requiresCount)return {ok:false,reason:'Adquira '+m.requiresCount+' adaptações celulares'};
+  if(m.requiresCount&&owned.filter(id=>CellSystem.mutations.some(x=>x.id===id&&x.id!=='multicellular')).length<m.requiresCount)return {ok:false,reason:'Tenha '+m.requiresCount+' adaptações'};
   return {ok:true,reason:''};
 };
 CellSystem.buy=function(id){
@@ -164,67 +193,135 @@ CellSystem.buy=function(id){
   Game.species.dna-=m.cost;Game.species.mutations.push(m.id);
   for(const[k,v]of Object.entries(m.effect||{}))Game.cell[k]=(Game.cell[k]||0)+v;
   if(m.id==='vacuole'){Game.cell.energyMax+=24;Game.cell.waterMax+=18;}
-  if(m.id==='membrane'){Game.cell.hpMax+=22;Game.cell.hp=Math.min(Game.cell.hpMax,Game.cell.hp+22);}
-  Game.species.history.push('Célula: '+m.name);
-  say('Mutação adquirida: '+m.name);
+  if(m.id==='membrane'){Game.cell.hpMax+=24;Game.cell.hp=Math.min(Game.cell.hpMax,Game.cell.hp+24);}
+  Game.species.history.push('Célula: '+m.name);say('Mutação: '+m.name);
   if(m.final){CellSystem.transition();return true;}
   CellSystem.refreshObjective();return true;
 };
+CellSystem.consumeParticle=function(p,index){
+  const cell=Game.cell;
+  if(p.type==='light'&&cell.photosynthesis<=0)return false;
+  const feedBoost=1+(cell.feeding||0)/100;
+  if(p.type==='nutrient'){cell.energy=clamp(cell.energy+7*feedBoost,0,cell.energyMax);Game.species.biomass+=1;Game.species.dna+=1.4*feedBoost;}
+  else if(p.type==='mineral'){cell.energy=clamp(cell.energy+2,0,cell.energyMax);Game.species.dna+=.8;}
+  else if(p.type==='light'){cell.energy=clamp(cell.energy+5+(cell.photosynthesis||0)*.13,0,cell.energyMax);Game.species.dna+=.65;}
+  else if(p.type==='dna'){Game.species.dna+=p.value;cell.energy=clamp(cell.energy+3,0,cell.energyMax);}
+  cell.particles.splice(index,1);cell.absorbed++;return true;
+};
 CellSystem.absorb=function(){
   const cell=Game.cell;if(!cell||cell.feedCooldown>0)return;
-  cell.feedCooldown=.28;
-  let consumed=0;
+  cell.feedCooldown=.18;
+  let n=0;
   for(let i=cell.particles.length-1;i>=0;i--){
     const p=cell.particles[i],d=Math.hypot(p.x-cell.x,p.y-cell.y);
-    const reach=cell.radius+14+(cell.sense||0)*.16;
-    if(d>reach)continue;
-    if(p.type==='light'&&cell.photosynthesis<=0)continue;
-    const feedBoost=1+(cell.feeding||0)/90;
-    if(p.type==='nutrient'){cell.energy=clamp(cell.energy+10*feedBoost,0,cell.energyMax);Game.species.biomass+=2;Game.species.dna+=2*feedBoost;}
-    else if(p.type==='mineral'){cell.energy=clamp(cell.energy+3,0,cell.energyMax);Game.species.dna+=1;}
-    else if(p.type==='light'){cell.energy=clamp(cell.energy+7+(cell.photosynthesis||0)*.16,0,cell.energyMax);Game.species.dna+=1.2;}
-    else if(p.type==='dna'){Game.species.dna+=p.value;cell.energy=clamp(cell.energy+4,0,cell.energyMax);}
-    cell.particles.splice(i,1);consumed++;cell.absorbed++;
-    if(consumed>=4)break;
+    if(d>cell.radius+28+(cell.sense||0)*.12)continue;
+    if(CellSystem.consumeParticle(p,i))n++;
+    if(n>=6)break;
   }
-  if(consumed){say('Absorção celular • +DNA');}
+};
+CellSystem.eatMicrobe=function(index){
+  const cell=Game.cell,m=cell.microbes[index];if(!m)return;
+  const bonus=Game.species.mutations.includes('phagocytosis')?1.45:1;
+  Game.species.dna+=Math.max(2,m.radius*.34*bonus);
+  Game.species.biomass+=Math.max(1,Math.round(m.radius/10));
+  cell.energy=clamp(cell.energy+10+m.radius*.55*bonus,0,cell.energyMax);
+  cell.radius=clamp(cell.radius+m.radius*.035,14,54);
+  cell.cellsEaten++;
+  cell.microbes.splice(index,1);
+  if(cell.cellsEaten%4===0)say('Você está crescendo ao absorver outras células.');
+};
+CellSystem.damagePlayer=function(m,dt){
+  const cell=Game.cell;if(cell.hitCooldown>0)return;
+  const protection=clamp((cell.membrane||0)/90,0,.72);
+  const damage=(4+Math.max(0,m.radius-cell.radius)*.35)*(1-protection);
+  cell.hp-=damage;cell.energy=Math.max(0,cell.energy-damage*.28);cell.hitCooldown=.24;
+  const dx=cell.x-m.x,dy=cell.y-m.y,len=Math.hypot(dx,dy)||1;
+  cell.x=clamp(cell.x+dx/len*20,cell.radius,CellSystem.WORLD_W-cell.radius);
+  cell.y=clamp(cell.y+dy/len*20,cell.radius,CellSystem.WORLD_H-cell.radius);
+  if(m.toxin)cell.hp-=2.5*(1-protection);
+};
+CellSystem.respawn=function(){
+  const cell=Game.cell;
+  cell.hp=cell.hpMax*.72;cell.energy=cell.energyMax*.55;cell.water=cell.waterMax;
+  cell.radius=Math.max(15,cell.radius*.9);Game.species.dna=Math.max(0,Game.species.dna-7);
+  cell.x=CellSystem.WORLD_W*.5+(rand()-.5)*280;cell.y=CellSystem.WORLD_H*.5+(rand()-.5)*280;
+  cell.camera.x=cell.x;cell.camera.y=cell.y;say('Uma célula maior quase engoliu você. A linhagem perdeu parte do DNA.');
+};
+CellSystem.updateMicrobes=function(dt){
+  const cell=Game.cell;
+  for(let i=cell.microbes.length-1;i>=0;i--){
+    const m=cell.microbes[i];m.pulse+=dt;m.turn-=dt;m.cooldown-=dt;
+    const dx=cell.x-m.x,dy=cell.y-m.y,d=Math.hypot(dx,dy)||1;
+    const bigger=m.radius>cell.radius*1.14,smaller=cell.radius>m.radius*(Game.species.mutations.includes('phagocytosis')?1.06:1.28);
+    if(bigger&&d<720&&m.aggressive>.38){
+      m.state='hunt';m.vx=dx/d*m.speed*1.12;m.vy=dy/d*m.speed*1.12;
+    }else if(smaller&&d<430){
+      m.state='flee';m.vx=-dx/d*m.speed*1.2;m.vy=-dy/d*m.speed*1.2;
+    }else if(m.turn<=0){
+      m.state='wander';m.angle+=(rand()-.5)*2.2;m.turn=.7+rand()*2.8;m.vx=Math.cos(m.angle)*m.speed*.48;m.vy=Math.sin(m.angle)*m.speed*.48;
+    }
+    m.x=clamp(m.x+m.vx*dt,m.radius,CellSystem.WORLD_W-m.radius);
+    m.y=clamp(m.y+m.vy*dt,m.radius,CellSystem.WORLD_H-m.radius);
+    if(m.photosynthetic)m.hp=clamp(m.hp+dt*.6,0,m.maxHp);
+    if(d<(m.radius+cell.radius)*.78){
+      if(smaller){CellSystem.eatMicrobe(i);continue;}
+      if(bigger){CellSystem.damagePlayer(m,dt);}
+      else{
+        const nx=dx/d,ny=dy/d;cell.x=clamp(cell.x+nx*3,cell.radius,CellSystem.WORLD_W-cell.radius);cell.y=clamp(cell.y+ny*3,cell.radius,CellSystem.WORLD_H-cell.radius);
+      }
+    }
+    if(Game.species.mutations.includes('toxin')&&d<(m.radius+cell.radius)*.95)m.hp-=dt*(4+(cell.toxin||0)*.16);
+    if(m.hp<=0){Game.species.dna+=2;cell.microbes.splice(i,1);}
+  }
+
+  for(let i=cell.microbes.length-1;i>=0;i--){
+    const a=cell.microbes[i];if(!a)continue;
+    for(let j=i-1;j>=0;j--){
+      const b=cell.microbes[j];if(!b)continue;
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d>(a.radius+b.radius)*.68)continue;
+      const big=a.radius>=b.radius?a:b,small=big===a?b:a;
+      if(big.radius<small.radius*1.3)continue;
+      big.radius=clamp(big.radius+small.radius*.012,7,58);big.hp=Math.min(big.maxHp,big.hp+small.radius*.25);
+      const remove=big===a?j:i;
+      cell.microbes.splice(remove,1);
+      if(remove===i)break;
+    }
+  }
 };
 CellSystem.update=function(dt){
   const cell=Game.cell;if(!cell)return;
-  cell.age+=dt;cell.pulse+=dt;cell.feedCooldown-=dt;
+  cell.age+=dt;cell.pulse+=dt;cell.feedCooldown-=dt;cell.hitCooldown-=dt;
   const ix=(Game.keys.a||Game.keys.ArrowLeft?-1:0)+(Game.keys.d||Game.keys.ArrowRight?1:0);
   const iy=(Game.keys.w||Game.keys.ArrowUp?-1:0)+(Game.keys.s||Game.keys.ArrowDown?1:0);
   let mx=ix,my=iy;
   if(mx||my){
     const len=Math.hypot(mx,my)||1;mx/=len;my/=len;
-    const speed=75+(cell.mobility||0)*2.3;
-    cell.x=clamp(cell.x+mx*speed*dt,cell.radius,canvas.width-cell.radius);
-    cell.y=clamp(cell.y+my*speed*dt,cell.radius,canvas.height-cell.radius);
-    cell.energy-=dt*(1.8-Math.min(.7,(cell.mobility||0)/100));
+    const speed=115+(cell.mobility||0)*2.8;
+    cell.x=clamp(cell.x+mx*speed*dt,cell.radius,CellSystem.WORLD_W-cell.radius);
+    cell.y=clamp(cell.y+my*speed*dt,cell.radius,CellSystem.WORLD_H-cell.radius);
+    cell.energy-=dt*(1.25-Math.min(.45,(cell.mobility||0)/130));
   }
-  const photo=cell.photosynthesis>0?(1.1+(cell.photosynthesis||0)*.025):0;
-  cell.energy=clamp(cell.energy+photo*dt-.55*dt,0,cell.energyMax);
-  cell.water=clamp(cell.water-.04*dt,0,cell.waterMax);
-  if(cell.energy<=0)cell.hp-=8*dt;
-  if(cell.hp<=0){
-    cell.hp=cell.hpMax*.65;cell.energy=cell.energyMax*.45;cell.x=canvas.width*.5;cell.y=canvas.height*.5;
-    Game.species.dna=Math.max(0,Game.species.dna-8);say('A célula quase morreu. Parte do DNA acumulado foi perdida.');
+  const photo=cell.photosynthesis>0?(1+(cell.photosynthesis||0)*.026):0;
+  cell.energy=clamp(cell.energy+photo*dt-.42*dt,0,cell.energyMax);
+  cell.water=clamp(cell.water-.02*dt,0,cell.waterMax);
+  if(cell.energy<=0)cell.hp-=6*dt;
+  if(cell.hp<=0)CellSystem.respawn();
+
+  for(let i=cell.particles.length-1;i>=0;i--){
+    const p=cell.particles[i];p.phase+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;
+    if(p.x<8||p.x>CellSystem.WORLD_W-8)p.vx*=-1;if(p.y<8||p.y>CellSystem.WORLD_H-8)p.vy*=-1;
+    if(Math.hypot(p.x-cell.x,p.y-cell.y)<cell.radius+p.r+4)CellSystem.consumeParticle(p,i);
   }
-  for(const p of cell.particles){
-    p.x+=p.vx*dt;p.y+=p.vy*dt;
-    if(p.x<5||p.x>canvas.width-5)p.vx*=-1;if(p.y<5||p.y>canvas.height-5)p.vy*=-1;
-  }
-  for(const h of cell.hazards){
-    h.phase+=dt;h.x+=h.vx*dt;h.y+=h.vy*dt;
-    if(h.x<8||h.x>canvas.width-8)h.vx*=-1;if(h.y<8||h.y>canvas.height-8)h.vy*=-1;
-    if(Math.hypot(h.x-cell.x,h.y-cell.y)<h.r+cell.radius*.72){
-      const protection=clamp((cell.membrane||0)/80,0,.7);
-      cell.hp-=dt*14*(1-protection);cell.energy-=dt*3;
-    }
-  }
-  if(cell.photosynthesis>0&&rand()<dt*.9)Game.species.dna+=dt*.22*(1+cell.photosynthesis/50);
-  while(cell.particles.length<95)CellSystem.spawnParticle();
-  while(cell.hazards.length<12)CellSystem.spawnHazard();
+  CellSystem.updateMicrobes(dt);
+  if(cell.photosynthesis>0)Game.species.dna+=dt*.055*(1+cell.photosynthesis/55);
+
+  const zoneX=Math.floor(cell.x/700),zoneY=Math.floor(cell.y/700);cell.explored.add(zoneX+':'+zoneY);
+  while(cell.particles.length<300)CellSystem.spawnParticle(true);
+  while(cell.microbes.length<68)CellSystem.spawnMicrobe();
+
+  cell.camera.x+=(cell.x-cell.camera.x)*Math.min(1,dt*4.6);
+  cell.camera.y+=(cell.y-cell.camera.y)*Math.min(1,dt*4.6);
   Game.player.x=cell.x;Game.player.y=cell.y;Game.player.hp=cell.hp;Game.player.energy=cell.energy;Game.player.water=cell.water;
   CellSystem.refreshObjective();
 };
@@ -232,78 +329,113 @@ CellSystem.refreshObjective=function(){
   if(!Game.species||!Game.cell)return;
   const owned=Game.species.mutations.filter(id=>CellSystem.mutations.some(m=>m.id===id));
   const hasNucleus=owned.includes('nucleus');
-  UI.objectiveTitle.textContent=hasNucleus?'Prepare a multicelularidade':'Construa sua primeira célula';
-  UI.objectiveDesc.textContent=hasNucleus?'Acumule DNA e una suas células para iniciar um organismo complexo.':'Colete DNA e escolha adaptações. Suas escolhas já começam a definir animal, planta ou uma estratégia mista.';
+  UI.objectiveTitle.textContent=hasNucleus?'Prepare a multicelularidade':'Cresça e evolua';
+  UI.objectiveDesc.textContent=hasNucleus?'Acumule DNA suficiente para unir suas células.':'Absorva partículas e células menores. Fuja das maiores e compre adaptações quando tiver DNA.';
   UI.objectiveProgress.textContent=Math.min(owned.length,5)+' / 5 adaptações';
   const bar=UI.objectiveProgress.parentElement?.querySelector('em');if(bar)bar.style.width=clamp(owned.length/5*100,0,100)+'%';
 };
-CellSystem.draw=function(){
-  const cell=Game.cell;
-  ctx.fillStyle='#061a20';ctx.fillRect(0,0,canvas.width,canvas.height);
-  const grad=ctx.createRadialGradient(canvas.width*.52,canvas.height*.42,20,canvas.width*.52,canvas.height*.42,Math.max(canvas.width,canvas.height)*.72);
-  grad.addColorStop(0,'rgba(30,104,111,.32)');grad.addColorStop(.55,'rgba(10,54,64,.18)');grad.addColorStop(1,'rgba(2,14,20,.72)');
-  ctx.fillStyle=grad;ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.save();
-  for(let i=0;i<34;i++){
-    const x=(i*173+Game.time*7)%canvas.width,y=(i*97+Math.sin(Game.time*.2+i)*34+canvas.height)%canvas.height;
-    ctx.fillStyle='rgba(128,213,202,.045)';ctx.beginPath();ctx.arc(x,y,8+(i%5)*3,0,Math.PI*2);ctx.fill();
+CellSystem.toScreen=function(x,y){
+  const c=Game.cell.camera;return{x:canvas.width*.5+(x-c.x),y:canvas.height*.5+(y-c.y)};
+};
+CellSystem.visible=function(x,y,r=0){
+  const s=CellSystem.toScreen(x,y);return s.x>-r-80&&s.y>-r-80&&s.x<canvas.width+r+80&&s.y<canvas.height+r+80;
+};
+CellSystem.drawBlob=function(target,x,y,r,color,pulse=0,nucleus=false,flagella=false,toxin=false){
+  target.save();target.translate(x,y);
+  const wobble=1+Math.sin(Game.time*3+pulse)*.035;
+  target.shadowColor=color;target.shadowBlur=Math.min(24,r*.55);
+  target.fillStyle=color;target.beginPath();
+  const points=18;
+  for(let i=0;i<=points;i++){
+    const a=i/points*Math.PI*2,rr=r*wobble*(1+Math.sin(a*3+pulse+Game.time*2)*.055);
+    const px=Math.cos(a)*rr,py=Math.sin(a)*rr;
+    if(i===0)target.moveTo(px,py);else target.lineTo(px,py);
   }
+  target.closePath();target.fill();target.shadowBlur=0;
+  target.strokeStyle='rgba(230,255,248,.42)';target.lineWidth=Math.max(1.5,r*.07);target.stroke();
+  target.fillStyle='rgba(15,42,48,.55)';target.beginPath();target.arc(-r*.15,-r*.08,r*.35,0,Math.PI*2);target.fill();
+  if(nucleus){target.fillStyle='rgba(124,98,188,.78)';target.beginPath();target.arc(-r*.12,-r*.07,r*.16,0,Math.PI*2);target.fill();}
+  if(toxin){target.fillStyle='rgba(247,106,126,.8)';for(let i=0;i<5;i++){const a=i/5*Math.PI*2+Game.time*.25;target.beginPath();target.arc(Math.cos(a)*r*.62,Math.sin(a)*r*.62,Math.max(2,r*.07),0,Math.PI*2);target.fill();}}
+  if(flagella){
+    target.strokeStyle='rgba(176,235,221,.6)';target.lineWidth=Math.max(1.5,r*.08);target.beginPath();target.moveTo(-r*.8,0);target.bezierCurveTo(-r*1.4,-r*.55+Math.sin(Game.time*7+pulse)*r*.2,-r*1.8,r*.35,-r*2.3,Math.sin(Game.time*6+pulse)*r*.45);target.stroke();
+  }
+  target.restore();
+};
+CellSystem.drawRadar=function(){
+  const cell=Game.cell,w=142,h=92,x=canvas.width-w-18,y=18;
+  ctx.save();ctx.fillStyle='rgba(3,13,18,.72)';ctx.fillRect(x,y,w,h);ctx.strokeStyle='rgba(166,220,211,.18)';ctx.strokeRect(x,y,w,h);
+  for(const m of cell.microbes){
+    if(m.radius<cell.radius*1.15)continue;
+    ctx.fillStyle='rgba(232,101,111,.65)';ctx.fillRect(x+m.x/CellSystem.WORLD_W*w-1,y+m.y/CellSystem.WORLD_H*h-1,2,2);
+  }
+  ctx.fillStyle='#d8fff0';ctx.beginPath();ctx.arc(x+cell.x/CellSystem.WORLD_W*w,y+cell.y/CellSystem.WORLD_H*h,3,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#9cbeb7';ctx.font='10px system-ui';ctx.fillText('mapa microscópico',x+8,y+h-8);ctx.restore();
+};
+CellSystem.draw=function(){
+  const cell=Game.cell,theme=CellSystem.biomeTheme();
+  ctx.fillStyle=theme.water;ctx.fillRect(0,0,canvas.width,canvas.height);
+  const grad=ctx.createRadialGradient(canvas.width*.5,canvas.height*.46,30,canvas.width*.5,canvas.height*.46,Math.max(canvas.width,canvas.height)*.75);
+  grad.addColorStop(0,'rgba(42,120,125,.2)');grad.addColorStop(.65,'rgba(4,38,47,.08)');grad.addColorStop(1,'rgba(2,10,16,.58)');ctx.fillStyle=grad;ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  const grid=240,ox=((-cell.camera.x%grid)+grid)%grid,oy=((-cell.camera.y%grid)+grid)%grid;
+  ctx.strokeStyle='rgba(150,225,215,.035)';ctx.lineWidth=1;
+  for(let x=ox;x<canvas.width;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+  for(let y=oy;y<canvas.height;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+  for(let i=0;i<42;i++){
+    const wx=(i*613+Game.seed%1100)%CellSystem.WORLD_W,wy=(i*397+(Game.seed>>4)%800)%CellSystem.WORLD_H;
+    if(!CellSystem.visible(wx,wy,50))continue;const s=CellSystem.toScreen(wx,wy);
+    ctx.fillStyle='rgba(112,203,194,.035)';ctx.beginPath();ctx.arc(s.x,s.y,12+(i%5)*7,0,Math.PI*2);ctx.fill();
+  }
+
   for(const p of cell.particles){
-    ctx.globalAlpha=p.type==='light'?.72:.9;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
-    if(p.type==='dna'){ctx.strokeStyle='rgba(180,198,255,.65)';ctx.beginPath();ctx.arc(p.x,p.y,p.r+3,0,Math.PI*2);ctx.stroke();}
+    if(!CellSystem.visible(p.x,p.y,10))continue;const s=CellSystem.toScreen(p.x,p.y);
+    ctx.globalAlpha=p.type==='light'?.7:.92;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(s.x,s.y,p.r+Math.sin(p.phase*2)*.4,0,Math.PI*2);ctx.fill();
+    if(p.type==='dna'){ctx.strokeStyle='rgba(188,203,255,.55)';ctx.beginPath();ctx.arc(s.x,s.y,p.r+3,0,Math.PI*2);ctx.stroke();}
   }
   ctx.globalAlpha=1;
-  for(const h of cell.hazards){
-    const rr=h.r+Math.sin(h.phase*2)*2;ctx.fillStyle='rgba(187,74,91,.68)';ctx.beginPath();ctx.arc(h.x,h.y,rr,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='rgba(255,150,155,.32)';ctx.beginPath();ctx.arc(h.x,h.y,rr+4,0,Math.PI*2);ctx.stroke();
+
+  const visibleMicrobes=cell.microbes.filter(m=>CellSystem.visible(m.x,m.y,m.radius)).sort((a,b)=>a.radius-b.radius);
+  for(const m of visibleMicrobes){
+    const s=CellSystem.toScreen(m.x,m.y);
+    CellSystem.drawBlob(ctx,s.x,s.y,m.radius,m.color,m.pulse,m.nucleus,m.flagella,m.toxin);
+    if(m.state==='hunt'&&m.radius>cell.radius*1.14){
+      ctx.strokeStyle='rgba(238,91,105,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y,m.radius+8+Math.sin(Game.time*5+m.pulse)*3,0,Math.PI*2);ctx.stroke();
+    }
   }
-  const path=CellSystem.path();const base=path==='vegetal'?'#6fbd75':path==='animal'?'#d28b62':'#70b9b8';
-  ctx.shadowColor=base;ctx.shadowBlur=18;ctx.fillStyle=base;ctx.beginPath();ctx.arc(cell.x,cell.y,cell.radius+Math.sin(cell.pulse*3)*1.5,0,Math.PI*2);ctx.fill();
-  ctx.shadowBlur=0;ctx.strokeStyle='rgba(225,255,244,.7)';ctx.lineWidth=Math.max(2,2+(cell.membrane||0)/28);ctx.beginPath();ctx.arc(cell.x,cell.y,cell.radius+2,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle='rgba(17,55,59,.72)';ctx.beginPath();ctx.arc(cell.x-4,cell.y-2,cell.radius*.42,0,Math.PI*2);ctx.fill();
-  if(Game.species.mutations.includes('nucleus')){ctx.fillStyle='#8f78c9';ctx.beginPath();ctx.arc(cell.x-3,cell.y-2,cell.radius*.24,0,Math.PI*2);ctx.fill();}
-  if(Game.species.mutations.includes('flagellum')){
-    ctx.strokeStyle='#8ee0ca';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(cell.x-cell.radius,cell.y);ctx.bezierCurveTo(cell.x-36,cell.y-18+Math.sin(Game.time*8)*8,cell.x-50,cell.y+18,cell.x-68,cell.y+Math.sin(Game.time*6)*14);ctx.stroke();
-  }
+
+  const me=CellSystem.toScreen(cell.x,cell.y),path=CellSystem.path(),base=path==='vegetal'?'#70c06f':path==='animal'?'#df9569':'#71c6c0';
+  CellSystem.drawBlob(ctx,me.x,me.y,cell.radius,base,cell.pulse,Game.species.mutations.includes('nucleus'),Game.species.mutations.includes('flagellum'),Game.species.mutations.includes('toxin'));
   if(Game.species.mutations.includes('cilia')){
-    ctx.strokeStyle='rgba(173,235,219,.65)';ctx.lineWidth=1.5;
-    for(let i=0;i<14;i++){const a=i/14*Math.PI*2;ctx.beginPath();ctx.moveTo(cell.x+Math.cos(a)*(cell.radius+2),cell.y+Math.sin(a)*(cell.radius+2));ctx.lineTo(cell.x+Math.cos(a)*(cell.radius+8),cell.y+Math.sin(a)*(cell.radius+8));ctx.stroke();}
+    ctx.strokeStyle='rgba(188,243,228,.58)';ctx.lineWidth=1.4;for(let i=0;i<16;i++){const a=i/16*Math.PI*2;ctx.beginPath();ctx.moveTo(me.x+Math.cos(a)*(cell.radius+2),me.y+Math.sin(a)*(cell.radius+2));ctx.lineTo(me.x+Math.cos(a)*(cell.radius+8),me.y+Math.sin(a)*(cell.radius+8));ctx.stroke();}
   }
   if(Game.species.mutations.includes('chloroplasts')){
-    ctx.fillStyle='#95dc6e';for(let i=0;i<5;i++){const a=i/5*Math.PI*2+Game.time*.15;ctx.beginPath();ctx.arc(cell.x+Math.cos(a)*cell.radius*.58,cell.y+Math.sin(a)*cell.radius*.58,3,0,Math.PI*2);ctx.fill();}
+    ctx.fillStyle='#a6e777';for(let i=0;i<6;i++){const a=i/6*Math.PI*2+Game.time*.18;ctx.beginPath();ctx.arc(me.x+Math.cos(a)*cell.radius*.58,me.y+Math.sin(a)*cell.radius*.58,3,0,Math.PI*2);ctx.fill();}
   }
   ctx.restore();
-  ctx.fillStyle='rgba(3,13,16,.7)';ctx.fillRect(18,18,310,68);
-  ctx.fillStyle='#d8f2e8';ctx.font='700 14px system-ui';ctx.fillText('ESTÁGIO CELULAR',32,43);
-  ctx.fillStyle='#88aaa5';ctx.font='12px system-ui';ctx.fillText('E absorver • Q evoluir • evite células tóxicas',32,65);
-  ctx.fillStyle='#a8e4c5';ctx.fillText('Tendência: '+path,32,82);
+
+  ctx.save();
+  ctx.fillStyle='rgba(3,14,18,.72)';ctx.fillRect(16,16,250,76);
+  ctx.fillStyle='#e2f6ef';ctx.font='700 14px system-ui';ctx.fillText(Game.species.name+' • célula',30,39);
+  ctx.fillStyle='#9abeb6';ctx.font='12px system-ui';ctx.fillText('DNA '+Math.floor(Game.species.dna)+'   tamanho '+cell.radius.toFixed(1),30,60);
+  ctx.fillStyle=cell.hp<35?'#ff8b91':'#97e3bd';ctx.fillText('vida '+Math.max(0,Math.round(cell.hp))+'   energia '+Math.round(cell.energy),30,79);
+  ctx.restore();
+  CellSystem.drawRadar();
 };
 CellSystem.drawPortrait=function(target,x,y,size){
-  const cell=Game.cell||{membrane:0};const path=CellSystem.path();const base=path==='vegetal'?'#6fbd75':path==='animal'?'#d28b62':'#70b9b8';
-  target.save();target.translate(x,y);target.fillStyle=base;target.beginPath();target.arc(0,0,size*.36,0,Math.PI*2);target.fill();
-  target.strokeStyle='#c8efe2';target.lineWidth=2+Math.min(4,(cell.membrane||0)/20);target.stroke();
-  target.fillStyle='#193c3c';target.beginPath();target.arc(-size*.07,-size*.03,size*.14,0,Math.PI*2);target.fill();
-  if(Game.species?.mutations?.includes('nucleus')){target.fillStyle='#8f78c9';target.beginPath();target.arc(-size*.05,-size*.03,size*.075,0,Math.PI*2);target.fill();}
-  target.restore();
+  const cell=Game.cell||{membrane:0};const path=CellSystem.path();const base=path==='vegetal'?'#70c06f':path==='animal'?'#df9569':'#71c6c0';
+  CellSystem.drawBlob(target,x,y,size*.34,base,cell.pulse||0,Game.species?.mutations?.includes('nucleus'),Game.species?.mutations?.includes('flagellum'),Game.species?.mutations?.includes('toxin'));
 };
 CellSystem.transition=function(){
   const cell=Game.cell,path=CellSystem.path();
   Game.stage='organism';document.body.classList.remove('cell-stage');
   const plant=path==='vegetal';
   const genes=normGenes({
-    body:plant?'plant':'fish',
-    color:plant?'#70a95e':'#6594a6',
-    size:.72,
-    speed:plant?0:36+(cell.mobility||0)*.28,
-    jump:plant?0:5,
-    swim:plant?0:58+(cell.mobility||0)*.35,
-    defense:22+(cell.membrane||0)*.35,
-    vision:20+(cell.sense||0)*.8,
-    feed:plant?10:38+(cell.feeding||0)*.6,
-    rootDepth:plant?48+(cell.storage||0)*.5:0,
-    leafArea:plant?44+(cell.photosynthesis||0)*.6:0,
-    toxin:cell.toxin||0,
-    intelligence:8+Math.round((cell.complexity||0)*.12)
+    body:plant?'plant':'fish',color:plant?'#70a95e':'#6594a6',size:.72,
+    speed:plant?0:36+(cell.mobility||0)*.28,jump:plant?0:5,swim:plant?0:58+(cell.mobility||0)*.35,
+    defense:22+(cell.membrane||0)*.35,vision:20+(cell.sense||0)*.8,feed:plant?10:38+(cell.feeding||0)*.6,
+    rootDepth:plant?48+(cell.storage||0)*.5:0,leafArea:plant?44+(cell.photosynthesis||0)*.6:0,
+    toxin:cell.toxin||0,intelligence:8+Math.round((cell.complexity||0)*.12)
   });
   Game.species.genes=genes;Game.species.type=plant?'Vegetal':'Aquático';Game.species.lifePath=path;Game.species.generation=1;
   Game.species.history.push('Multicelularidade alcançada. Caminho inicial: '+path+'.');
@@ -311,10 +443,8 @@ CellSystem.transition=function(){
   Game.player={id:'hero_1',x:D.WORLD_W/2,y:D.WORLD_H/2,hp:genes.hpMax,energy:genes.energyMax,water:genes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
   for(let tries=0;tries<800;tries++){const x=randi(6,D.WORLD_W-7),y=randi(6,D.WORLD_H-7);if(D.BIOME_ORDER[tile(x,y)]===Game.selectedBiome){Game.player.x=x+.5;Game.player.y=y+.5;break;}}
   Game.lineage.push({id:'g1',name:Game.species.name,generation:1,biome:Game.selectedBiome,parents:['cell_origin'],genes:normGenes(genes),note:plant?'Primeiro organismo vegetal multicelular.':'Primeiro organismo animal aquático.'});
-  Game.discoveries=new Set([Game.selectedBiome]);
-  setModal(UI.evo,false);
-  say(plant?'A linhagem tornou-se um organismo vegetal multicelular.':'A linhagem tornou-se um organismo animal aquático.');
-  UISystem.refresh();
+  Game.discoveries=new Set([Game.selectedBiome]);setModal(UI.evo,false);
+  say(plant?'A linhagem tornou-se um organismo vegetal multicelular.':'A linhagem tornou-se um organismo animal aquático.');UISystem.refresh();
 };
 
 WorldSystem.init=function(){
@@ -497,7 +627,7 @@ UISystem.refresh=function(){if(!Game.species||!Game.player)return;
     UI.speed.textContent=Math.round(cell.mobility);UI.defense.textContent=Math.round(cell.membrane);UI.jump.textContent=Math.round(cell.feeding+cell.photosynthesis);UI.vision.textContent=Math.round(cell.sense);
     UI.polish.innerHTML=`<div class="ph-chip">FASE <b>🦠 CÉLULA</b></div><div class="ph-chip">CAMINHO <b>${path}</b></div><div class="ph-chip">ABSORÇÕES <b>${cell.absorbed}</b></div><div class="ph-chip">COMPLEXIDADE <b>${Math.round(cell.complexity)}%</b></div>`;
     UI.dashboardSubtitle.textContent=`${Game.species.name} • estágio celular`;
-    if(UI.controlsHint)UI.controlsHint.textContent='WASD / setas para mover • E absorver • Q evoluir • Espaço pausar';
+    if(UI.controlsHint)UI.controlsHint.textContent='WASD / setas • encoste em alimento e células menores • Q evoluir';
     RenderSystem.drawPortraits();return;
   }
   const g=Game.species.genes,p=Game.player,b=BiomeSystem.at(p.x,p.y);UI.stageLabel.textContent=g.body==='plant'?'ORGANISMO VEGETAL':'ORGANISMO COMPLEXO';UI.species.textContent=Game.species.name;UI.type.textContent=(g.body==='plant'?'VEGETAL':g.body==='fish'?'AQUÁTICO':g.body==='bird'?'VOADOR':'TERRESTRE');UI.generation.textContent='Geração '+Game.species.generation;UI.dna.textContent=Math.floor(Game.species.dna);UI.biomass.textContent=Math.floor(Game.species.biomass);UI.stone.textContent=Game.species.inventory.pedra||0;UI.population.textContent=Game.species.population;UI.hp.textContent=Math.round(p.hp);UI.energy.textContent=Math.round(p.energy);UI.water.textContent=Math.round(p.water);UI.barHp.style.width=clamp(p.hp/g.hpMax*100,0,100)+'%';UI.barEnergy.style.width=clamp(p.energy/g.energyMax*100,0,100)+'%';UI.barWater.style.width=clamp(p.water/g.waterMax*100,0,100)+'%';UI.speed.textContent=Math.round(g.speed);UI.defense.textContent=Math.round(g.defense);UI.jump.textContent=Math.round(g.jump);UI.vision.textContent=Math.round(g.vision);const habitat=Math.round(BiomeSystem.habitat(g,p.x,p.y));UI.polish.innerHTML=`<div class="ph-chip">BIOMA <b>${b.icon} ${b.name}</b></div><div class="ph-chip">CLIMA <b>${D.WEATHER[Game.weather].name}</b></div><div class="ph-chip">DIA <b>${Game.day}</b></div><div class="ph-chip">HABITAT <b>${habitat}%</b></div>`;UI.dashboardSubtitle.textContent=`${Game.species.name} • ${b.name}`;if(UI.controlsHint)UI.controlsHint.textContent=g.body==='plant'?'E absorver • R dispersar sementes • Q evoluir • M mapa • L linhagem':'WASD / setas para mover • E comer • R reproduzir • Q evoluir • B construir • M mapa • L linhagem';RenderSystem.drawPortraits();};
@@ -521,9 +651,9 @@ UISystem.dashboard=function(tab=Game.activeTab){Game.activeTab=tab;const s=Game.
   UI.dashboardBody.innerHTML=html;document.querySelectorAll('[data-tech]').forEach(b=>b.onclick=()=>{if(TechnologySystem.unlock(b.dataset.tech))UISystem.dashboard('technology');UISystem.refresh();});document.querySelectorAll('.dashboard-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));};
 UISystem.map=function(){const w=mapCanvas.width,h=mapCanvas.height;mapCtx.fillStyle='#07110b';mapCtx.fillRect(0,0,w,h);const cw=w/D.WORLD_W,ch=h/D.WORLD_H;for(let y=0;y<D.WORLD_H;y++){for(let x=0;x<D.WORLD_W;x++){const b=D.BIOMES[D.BIOME_ORDER[tile(x,y)]];mapCtx.fillStyle=b.base;mapCtx.fillRect(x*cw,y*ch,Math.ceil(cw)+1,Math.ceil(ch)+1);}}if(Game.player){mapCtx.fillStyle='#fff';mapCtx.beginPath();mapCtx.arc(Game.player.x*cw,Game.player.y*ch,4,0,Math.PI*2);mapCtx.fill();}UI.mapLegend.innerHTML=D.BIOME_ORDER.map(id=>`<span class="legend-pill">${D.BIOMES[id].icon} ${D.BIOMES[id].name}</span>`).join('');setModal(UI.map,true);};
 UISystem.lineage=function(){lineageCtx.fillStyle='#07110b';lineageCtx.fillRect(0,0,lineageCanvas.width,lineageCanvas.height);const nodes=Game.lineage.slice(-22);nodes.forEach((n,i)=>{const x=40+(i%7)*125,y=55+Math.floor(i/7)*130;lineageCtx.fillStyle='#14271a';lineageCtx.fillRect(x,y,104,58);lineageCtx.strokeStyle='#3a6540';lineageCtx.strokeRect(x,y,104,58);lineageCtx.fillStyle='#e8f1e3';lineageCtx.font='900 11px monospace';lineageCtx.fillText('G'+n.generation,x+10,y+18);lineageCtx.fillStyle='#8fa58f';lineageCtx.font='9px monospace';lineageCtx.fillText(String(n.name).slice(0,15),x+10,y+35);if(i>0){lineageCtx.strokeStyle='#547657';lineageCtx.beginPath();lineageCtx.moveTo(x-22,y+28);lineageCtx.lineTo(x,y+28);lineageCtx.stroke();}});UI.lineageTree.innerHTML=nodes.slice().reverse().map(n=>`<div class="lineage-node"><b>G${n.generation}</b><span>${n.name}</span><small>${n.note||'Descendente registrado'}</small></div>`).join('');setModal(UI.lineage,true);};
-SaveSystem.serialize=function(){const safe={version:D.VERSION,stage:Game.stage,seed:Game.seed,selectedBiome:Game.selectedBiome,species:Game.species,cell:Game.stage==='cell'?Game.cell:null,player:{x:Game.player.x,y:Game.player.y,hp:Game.player.hp,energy:Game.player.energy,water:Game.player.water,alive:Game.player.alive},weather:Game.weather,weatherTimer:Game.weatherTimer,day:Game.day,hour:Game.hour,discoveries:[...Game.discoveries],buildings:Game.buildings.slice(0,160),lineage:Game.lineage.slice(-120)};return JSON.stringify(safe);};
+SaveSystem.serialize=function(){const cellSave=Game.stage==='cell'&&Game.cell?Object.assign({},Game.cell,{explored:[...(Game.cell.explored||[])]}):null;const safe={version:D.VERSION,stage:Game.stage,seed:Game.seed,selectedBiome:Game.selectedBiome,species:Game.species,cell:cellSave,player:{x:Game.player.x,y:Game.player.y,hp:Game.player.hp,energy:Game.player.energy,water:Game.player.water,alive:Game.player.alive},weather:Game.weather,weatherTimer:Game.weatherTimer,day:Game.day,hour:Game.hour,discoveries:[...Game.discoveries],buildings:Game.buildings.slice(0,160),lineage:Game.lineage.slice(-120)};return JSON.stringify(safe);};
 SaveSystem.save=function(){try{localStorage.setItem('bioevo_save_final',this.serialize());say('Jogo salvo localmente.');}catch(e){say('Não foi possível salvar: '+e.message);}};
-SaveSystem.load=function(){try{const raw=localStorage.getItem('bioevo_save_final');if(!raw)return false;const s=JSON.parse(raw);if(!s||!s.species||!s.player)return false;Game.stage=s.stage||'organism';Game.seed=s.seed||Game.seed;Game.selectedBiome=s.selectedBiome||'cerrado';Game.species=s.species;Game.player=Object.assign(Game.player||{},s.player,{alive:s.player.alive!==false});Game.cell=s.cell||null;Game.weather=s.weather||'clear';Game.weatherTimer=s.weatherTimer||50;Game.day=s.day||1;Game.hour=s.hour||6;Game.discoveries=new Set(s.discoveries||[]);Game.buildings=s.buildings||[];Game.lineage=s.lineage||[];if(Game.stage==='cell'&&Game.cell){document.body.classList.add('cell-stage');}return true;}catch(e){console.warn(e);return false;}};
+SaveSystem.load=function(){try{const raw=localStorage.getItem('bioevo_save_final');if(!raw)return false;const s=JSON.parse(raw);if(!s||!s.species||!s.player)return false;Game.stage=s.stage||'organism';Game.seed=s.seed||Game.seed;Game.selectedBiome=s.selectedBiome||'cerrado';Game.species=s.species;Game.player=Object.assign(Game.player||{},s.player,{alive:s.player.alive!==false});Game.cell=s.cell||null;if(Game.cell){Game.cell.explored=new Set(Array.isArray(Game.cell.explored)?Game.cell.explored:[]);Game.cell.camera=Game.cell.camera||{x:Game.cell.x,y:Game.cell.y};Game.cell.microbes=Game.cell.microbes||[];Game.cell.particles=Game.cell.particles||[];}Game.weather=s.weather||'clear';Game.weatherTimer=s.weatherTimer||50;Game.day=s.day||1;Game.hour=s.hour||6;Game.discoveries=new Set(s.discoveries||[]);Game.buildings=s.buildings||[];Game.lineage=s.lineage||[];if(Game.stage==='cell'&&Game.cell){document.body.classList.add('cell-stage');}return true;}catch(e){console.warn(e);return false;}};
 UISystem.bind=function(){
   window.addEventListener('resize',RenderSystem.resize);RenderSystem.resize();
   window.addEventListener('keydown',e=>{Game.keys[e.key]=true;const k=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(k==='q'){UISystem.renderEvolution();setModal(UI.evo,true);}if(k==='e'){if(Game.stage==='cell')CellSystem.absorb();else PlayerSystem.eat();}if(Game.stage!=='cell'&&k==='b'){UISystem.renderBuild();setModal(UI.build,true);}if(Game.stage!=='cell'&&k==='l')UISystem.lineage();if(Game.stage!=='cell'&&k==='m')UISystem.map();if(Game.stage!=='cell'&&k==='r')ReproductionSystem.tryBreed();if(Game.stage!=='cell'&&k==='f')PlayerSystem.attack();if(k==='escape'){[UI.evo,UI.build,UI.lineage,UI.map].forEach(x=>setModal(x,false));UI.dashboard.classList.add('hidden');}if(k===' '){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}});window.addEventListener('keyup',e=>{Game.keys[e.key]=false;});

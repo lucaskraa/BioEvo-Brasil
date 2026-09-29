@@ -3255,3 +3255,91 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
   font-weight:800;
   letter-spacing:.04em;
 }
+
+
+/* =========================================================
+   BIOEVO CELL WORLD V2 — interface simples e mapa amplo
+========================================================= */
+.cell-stage .game-shell{
+  grid-template-columns:1fr !important;
+}
+.cell-stage .hud-side{
+  display:none !important;
+}
+.cell-stage .world-panel{
+  background:#071a20;
+}
+.cell-stage .topbar{
+  height:56px;
+  padding:8px 12px;
+}
+.cell-stage .game-shell{
+  height:calc(100% - 56px);
+}
+.cell-stage .brand-mark{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  font-size:17px;
+}
+.cell-stage .brand h1{
+  font-size:15px;
+}
+.cell-stage .brand span{
+  display:none;
+}
+.cell-stage .top-actions [data-action="dashboard"],
+.cell-stage .top-actions [data-action="save"]{
+  display:none;
+}
+.cell-stage .top-actions .ui-btn{
+  padding:7px 10px;
+  font-size:9px;
+}
+.cell-stage .polish-hud{
+  top:auto;
+  bottom:44px;
+  left:14px;
+  right:auto;
+  max-width:min(75vw,700px);
+}
+.cell-stage .controls-hint{
+  left:14px;
+  bottom:10px;
+  font-size:9px;
+  padding:6px 9px;
+}
+.cell-stage .world-vignette{
+  background:radial-gradient(circle at 50% 50%,transparent 62%,rgba(1,8,13,.26) 100%);
+}
+.start-biomes{
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:7px;
+}
+.biome-choice{
+  min-height:70px;
+  padding:8px;
+  text-align:center;
+}
+.biome-choice .biome-icon{
+  font-size:20px;
+}
+.biome-choice strong{
+  font-size:9px;
+}
+.biome-choice small{
+  display:none;
+}
+.biome-choice.selected{
+  background:linear-gradient(180deg,#21452c,#10251a);
+  border-color:#8ad77e;
+  box-shadow:0 0 0 1px rgba(138,215,126,.8) inset,0 8px 25px rgba(77,164,84,.12);
+}
+.start-helper{
+  max-width:760px;
+}
+@media(max-width:760px){
+  .start-biomes{grid-template-columns:repeat(3,1fr)}
+  .cell-stage .polish-hud{max-width:90vw}
+  .cell-stage .ph-chip:nth-child(n+3){display:none}
+}

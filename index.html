@@ -37,7 +37,7 @@
   <div id='lineage-modal' class='modal hidden'><div class='modal-card lineage-card'><button class='modal-close' data-close='lineage-modal'>×</button><div class='modal-title'>ÁRVORE DA LINHAGEM</div><canvas id='lineage-canvas' width='900' height='520'></canvas><div id='lineage-tree' class='lineage-tree'></div></div></div>
   <div id='map-modal' class='modal hidden'><div class='modal-card map-card'><button class='modal-close' data-close='map-modal'>×</button><div class='modal-title'>ATLAS DOS BIOMAS</div><canvas id='map-canvas' width='900' height='540'></canvas><div id='map-legend' class='map-legend'></div></div></div>
   <section id='dashboard' class='dashboard hidden'><div class='dashboard-head'><div><strong>CENTRAL BIOEVO</strong><span id='dashboard-subtitle'>Estado da linhagem</span></div><button class='ui-btn' data-action='dashboard-close'>Fechar</button></div><nav class='dashboard-tabs'><button data-tab='overview'>Visão geral</button><button data-tab='ecology'>Ecologia</button><button data-tab='lineage'>Linhagem</button><button data-tab='culture'>Cultura</button><button data-tab='technology'>Tecnologia</button><button data-tab='codex'>Códex</button></nav><div id='dashboard-body' class='dashboard-body'></div></section>
-  <div id='start-modal' class='modal start-screen'><div class='modal-card start-card'><div class='start-hero'><div class='start-logo'>🧬</div><div><div class='eyebrow'>DO PRIMEIRO SER À CIVILIZAÇÃO</div><h2>BIOEVO: BRASIL NATIVO</h2><p>Comece como uma célula quase básica. Alimente-se, sobreviva e escolha cada adaptação que vai construir sua linhagem até animais, plantas, voo, terra, água e civilizações.</p></div></div><div class='start-form'><label for='input-species'>Nome da linhagem</label><input id='input-species' value='Carijó' maxlength='20'><label>Bioma brasileiro de destino</label><p class='start-helper'>A vida começa na água. Este bioma será a primeira grande região que sua linhagem poderá colonizar depois da fase microscópica.</p><div id='start-biomes' class='start-biomes'></div><div class='start-actions'><button id='btn-start' class='primary-btn'>NASCER COMO CÉLULA</button><span>Fase 1 • Célula • evolução por escolhas</span></div></div></div></div>
+  <div id='start-modal' class='modal start-screen'><div class='modal-card start-card'><div class='start-hero'><div class='start-logo'>🧬</div><div><div class='eyebrow'>DO PRIMEIRO SER À CIVILIZAÇÃO</div><h2>BIOEVO: BRASIL NATIVO</h2><p>Comece como uma célula quase básica. Alimente-se, sobreviva e escolha cada adaptação que vai construir sua linhagem até animais, plantas, voo, terra, água e civilizações.</p></div></div><div class='start-form'><label for='input-species'>Nome da linhagem</label><input id='input-species' value='Carijó' maxlength='20'><label>Escolha o bioma brasileiro futuro</label><p class='start-helper'>Você começa na água microscópica. Escolha agora qual bioma sua linhagem tentará alcançar quando sair da fase celular.</p><div id='start-biomes' class='start-biomes'></div><div class='start-actions'><button id='btn-start' class='primary-btn'>NASCER COMO CÉLULA</button><span>Mapa celular grande • absorção automática • predadores vivos</span></div></div></div></div>
 </div>
 <template id='codex-template-001'>
   <article class='codex-record'>
@@ -2747,9 +2747,9 @@ window.addEventListener('error', function(event){
   loading.innerHTML='<strong>Erro ao iniciar o BioEvo.</strong><span>'+String(event.message||'Erro desconhecido')+'</span>';
 });
 </script>
-<script src='data.js?v=cellular-1.1'></script>
-<script src='sprites.js?v=cellular-1.1'></script>
-<script src='game.js?v=cellular-1.1'></script>
+<script src='data.js?v=cell-world-2.0'></script>
+<script src='sprites.js?v=cell-world-2.0'></script>
+<script src='game.js?v=cell-world-2.0'></script>
 <script>document.getElementById('loading')?.classList.add('hidden');</script>
 </body>
 </html>

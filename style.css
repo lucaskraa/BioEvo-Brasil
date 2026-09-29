@@ -3343,3 +3343,283 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
   .cell-stage .polish-hud{max-width:90vw}
   .cell-stage .ph-chip:nth-child(n+3){display:none}
 }
+
+
+/* =========================================================
+   BIOEVO CELL LIFE V3 — laboratório simples e visual
+========================================================= */
+.cell-stage #evolution-modal{
+  padding:16px;
+  background:rgba(1,9,12,.78);
+  backdrop-filter:blur(10px);
+}
+.cell-stage .evolution-card{
+  width:min(1180px,97vw);
+  max-height:92vh;
+  overflow:hidden;
+  border:1px solid rgba(126,211,184,.22);
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 15% 15%,rgba(59,145,119,.10),transparent 32%),
+    linear-gradient(180deg,#0d201a,#091713);
+  box-shadow:0 32px 100px rgba(0,0,0,.55);
+}
+.cell-stage .evolution-card .modal-title{
+  height:58px;
+  display:flex;
+  align-items:center;
+  padding:0 20px;
+  border-bottom:1px solid rgba(135,211,185,.12);
+  font-size:13px;
+  letter-spacing:.10em;
+}
+.cell-stage .evolution-card .modal-close{
+  top:12px;
+  right:14px;
+  z-index:5;
+}
+.cell-stage .evo-layout{
+  display:grid;
+  grid-template-columns:220px minmax(0,1fr);
+  gap:14px;
+  padding:14px;
+  height:min(720px,calc(92vh - 58px));
+  min-height:0;
+}
+.cell-stage .evo-preview{
+  position:sticky;
+  top:0;
+  align-self:start;
+  padding:12px;
+  border:1px solid rgba(130,207,181,.13);
+  border-radius:17px;
+  background:rgba(6,20,17,.82);
+}
+.cell-stage .evo-preview canvas{
+  width:100%;
+  height:auto;
+  max-height:172px;
+  border-radius:13px;
+  background:
+    radial-gradient(circle at 50% 45%,rgba(68,156,143,.16),rgba(4,15,14,.92) 68%);
+}
+.cell-stage .evo-preview #dna-large{
+  margin:10px 0 0;
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(240,207,91,.08);
+  color:#f0d26d;
+  font-size:12px;
+}
+.cell-stage .gene-summary{
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+  margin-top:7px;
+}
+.cell-stage .gene-pill{
+  min-height:44px;
+  padding:7px 8px;
+  border-radius:10px;
+  background:rgba(255,255,255,.025);
+  border-color:rgba(135,211,185,.09);
+  font-size:8px;
+}
+.cell-stage .gene-pill b{
+  font-size:11px;
+}
+.cell-stage .evo-options{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  align-content:start;
+  gap:8px;
+  padding:0 5px 12px 0;
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+.cell-stage .evo-options::-webkit-scrollbar{
+  width:7px;
+}
+.cell-stage .evo-options::-webkit-scrollbar-thumb{
+  border-radius:999px;
+  background:rgba(127,202,176,.22);
+}
+.cell-stage .cell-evo-path{
+  grid-column:1/-1;
+  margin:0 0 2px;
+  padding:12px 14px;
+  border-radius:15px;
+  background:linear-gradient(135deg,rgba(31,82,67,.66),rgba(15,48,42,.52));
+  border:1px solid rgba(106,201,167,.22);
+}
+.evo-status-main{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.evo-status-main>div:first-child{
+  display:grid;
+  gap:2px;
+}
+.evo-kicker{
+  font-size:7px;
+  color:#78b8a0;
+  letter-spacing:.12em;
+  font-weight:800;
+}
+.evo-status-main strong{
+  color:#e7f8f0;
+  font-size:15px;
+  text-transform:capitalize;
+}
+.evo-dna-pill{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  background:rgba(234,203,95,.10);
+  border:1px solid rgba(234,203,95,.16);
+  color:#efd56e;
+  font-size:10px;
+  font-weight:900;
+}
+.evo-progress-row{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:10px;
+  align-items:center;
+  margin-top:9px;
+  color:#9fb9af;
+  font-size:8px;
+}
+.evo-progress-row i{
+  height:6px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(0,0,0,.26);
+}
+.evo-progress-row em{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#62bea0,#9bd173);
+}
+.cell-stage .cell-particle-legend{
+  gap:5px;
+  margin-top:9px;
+}
+.cell-stage .cell-particle-legend span{
+  padding:4px 7px;
+  background:rgba(5,19,17,.48);
+  font-size:7px;
+}
+.cell-stage .evo-option.cell-mutation{
+  min-height:124px;
+  padding:11px;
+  gap:7px;
+  border:1px solid rgba(126,202,176,.12);
+  border-radius:15px;
+  background:rgba(255,255,255,.018);
+  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+.cell-stage .evo-option.cell-mutation::before{
+  display:none;
+}
+.cell-stage .evo-option.cell-mutation:hover{
+  transform:translateY(-2px);
+  background:rgba(255,255,255,.032);
+}
+.cell-stage .evo-option.cell-mutation[data-branch="neutral"]{
+  border-color:rgba(93,179,203,.20);
+}
+.cell-stage .evo-option.cell-mutation[data-branch="animal"]{
+  border-color:rgba(214,143,96,.23);
+}
+.cell-stage .evo-option.cell-mutation[data-branch="plant"]{
+  border-color:rgba(116,189,106,.25);
+}
+.cell-stage .evo-option.cell-mutation.owned{
+  background:rgba(72,151,103,.10);
+  border-color:rgba(116,206,139,.34);
+}
+.cell-stage .evo-option.cell-mutation.locked:not(.owned){
+  opacity:.46;
+}
+.mutation-head{
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+.mutation-icon{
+  width:36px;
+  height:36px;
+  flex:0 0 36px;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  background:rgba(91,183,181,.10);
+  border:1px solid rgba(113,209,202,.14);
+  color:#a8e6dd;
+  font-size:18px;
+}
+[data-branch="animal"] .mutation-icon{
+  background:rgba(210,137,91,.10);
+  color:#e3aa79;
+}
+[data-branch="plant"] .mutation-icon{
+  background:rgba(104,177,92,.11);
+  color:#9bd087;
+}
+.mutation-head h3{
+  margin:0;
+  font-size:10px;
+  color:#edf8f2;
+}
+.mutation-branch{
+  display:block;
+  margin-top:3px;
+  color:#7f9d92;
+  font-size:7px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.cell-stage .cell-mutation>p{
+  min-height:28px;
+  margin:0;
+  overflow:hidden;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  color:#8ba79d;
+  font-size:8px;
+  line-height:1.45;
+}
+.cell-stage .cell-mutation footer{
+  margin-top:auto;
+  gap:7px;
+}
+.cell-stage .cell-mutation .cost{
+  font-size:9px;
+}
+.cell-stage .cell-mutation .small-btn{
+  min-width:70px;
+  padding:6px 8px;
+  border-radius:8px;
+  background:#153c2b;
+  border-color:#347b58;
+  font-size:7px;
+}
+.cell-stage .cell-mutation .small-btn:disabled{
+  cursor:default;
+  opacity:.58;
+}
+@media(max-width:980px){
+  .cell-stage .evo-layout{grid-template-columns:180px minmax(0,1fr)}
+  .cell-stage .evo-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:680px){
+  .cell-stage .evolution-card{max-height:96vh}
+  .cell-stage .evo-layout{height:calc(96vh - 58px);grid-template-columns:1fr;overflow:auto}
+  .cell-stage .evo-preview{position:static;display:grid;grid-template-columns:110px 1fr;gap:8px}
+  .cell-stage .evo-preview canvas{max-height:110px}
+  .cell-stage .gene-summary{grid-template-columns:repeat(3,1fr)}
+  .cell-stage .evo-options{grid-template-columns:1fr;overflow:visible}
+}

@@ -6,7 +6,7 @@
 <meta name='theme-color' content='#07110b'>
 <meta name='description' content='BioEvo: Brasil Nativo — evolução, ecologia e civilização em seis biomas brasileiros.'>
 <title>BioEvo: Brasil Nativo</title>
-<link rel='stylesheet' href='style.css?v=evolution-editor-4.0'>
+<link rel='stylesheet' href='style.css?v=tidepool-5.0'>
 </head>
 <body>
 <div id='app' class='app'>
@@ -19,7 +19,7 @@
       <canvas id='game' width='1120' height='700' aria-label='Mundo BioEvo'></canvas>
       <div id='polish-hud' class='polish-hud'></div>
       <div class='world-vignette'></div>
-      <div id='controls-hint' class='controls-hint'>WASD / setas para mover • E absorver • Q evoluir</div>
+      <div id='cell-progress-hud' class='cell-progress-hud'></div><div id='cell-mobile-controls' class='cell-mobile-controls' aria-label='Controles da célula'><div id='cell-joystick' class='cell-joystick'><i></i></div><div class='cell-mobile-actions'><button data-cell-action='absorb' aria-label='Absorver'>◉</button><button data-cell-action='evolve' aria-label='Evoluir'>🧬</button></div></div><div id='controls-hint' class='controls-hint'>WASD / setas para mover • E absorver • Q evoluir</div>
       <div id='toast' class='toast hidden'></div>
     </section>
     <aside class='hud-side'>
@@ -2747,9 +2747,9 @@ window.addEventListener('error', function(event){
   loading.innerHTML='<strong>Erro ao iniciar o BioEvo.</strong><span>'+String(event.message||'Erro desconhecido')+'</span>';
 });
 </script>
-<script src='data.js?v=cell-life-3.0'></script>
-<script src='sprites.js?v=cell-life-3.0'></script>
-<script src='game.js?v=evolution-editor-4.0'></script>
+<script src='data.js?v=tidepool-5.0'></script>
+<script src='sprites.js?v=tidepool-5.0'></script>
+<script src='game.js?v=tidepool-5.0'></script>
 <script>document.getElementById('loading')?.classList.add('hidden');</script>
 </body>
 </html>

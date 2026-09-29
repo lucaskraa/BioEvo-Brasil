@@ -8,8 +8,8 @@ const evoCanvas=document.getElementById('evo-portrait'); const evoCtx=evoCanvas.
 const mapCanvas=document.getElementById('map-canvas'); const mapCtx=mapCanvas.getContext('2d');
 const lineageCanvas=document.getElementById('lineage-canvas'); const lineageCtx=lineageCanvas.getContext('2d');
 const $=id=>document.getElementById(id);
-const UI={start:$('start-modal'),loading:$('loading'),toast:$('toast'),species:$('species-name'),type:$('species-type'),generation:$('generation-label'),dna:$('dna'),biomass:$('biomass'),stone:$('stone'),population:$('population'),hp:$('txt-hp'),energy:$('txt-energy'),water:$('txt-water'),barHp:$('bar-hp'),barEnergy:$('bar-energy'),barWater:$('bar-water'),speed:$('stat-speed'),defense:$('stat-defense'),jump:$('stat-jump'),vision:$('stat-vision'),objectiveTitle:$('objective-title'),objectiveDesc:$('objective-desc'),objectiveProgress:$('objective-progress'),log:$('event-log'),evo:$('evolution-modal'),evoOptions:$('evo-options'),dnaLarge:$('dna-large'),build:$('build-modal'),buildOptions:$('build-options'),lineage:$('lineage-modal'),lineageTree:$('lineage-tree'),map:$('map-modal'),mapLegend:$('map-legend'),dashboard:$('dashboard'),dashboardBody:$('dashboard-body'),dashboardSubtitle:$('dashboard-subtitle'),polish:$('polish-hud')};
-const Game={running:false,paused:false,last:performance.now(),time:0,day:1,hour:6,seed:Math.floor(Math.random()*1e9),selectedBiome:'cerrado',mouse:{x:0,y:0,down:false},keys:{},camera:{x:0,y:0,zoom:1},world:{},player:null,species:null,nearby:[],plants:[],animals:[],buildings:[],particles:[],floating:[],lineage:[],discoveries:new Set(),weather:'clear',weatherTimer:0,weatherTicks:0,objective:null,activeTab:'overview',autosaveTimer:0};
+const UI={start:$('start-modal'),loading:$('loading'),toast:$('toast'),species:$('species-name'),type:$('species-type'),generation:$('generation-label'),stageLabel:$('stage-label'),controlsHint:$('controls-hint'),dna:$('dna'),biomass:$('biomass'),stone:$('stone'),population:$('population'),hp:$('txt-hp'),energy:$('txt-energy'),water:$('txt-water'),barHp:$('bar-hp'),barEnergy:$('bar-energy'),barWater:$('bar-water'),speed:$('stat-speed'),defense:$('stat-defense'),jump:$('stat-jump'),vision:$('stat-vision'),objectiveTitle:$('objective-title'),objectiveDesc:$('objective-desc'),objectiveProgress:$('objective-progress'),log:$('event-log'),evo:$('evolution-modal'),evoTitle:$('evo-modal-title'),evoOptions:$('evo-options'),dnaLarge:$('dna-large'),build:$('build-modal'),buildOptions:$('build-options'),lineage:$('lineage-modal'),lineageTree:$('lineage-tree'),map:$('map-modal'),mapLegend:$('map-legend'),dashboard:$('dashboard'),dashboardBody:$('dashboard-body'),dashboardSubtitle:$('dashboard-subtitle'),polish:$('polish-hud')};
+const Game={running:false,paused:false,last:performance.now(),time:0,day:1,hour:6,seed:Math.floor(Math.random()*1e9),selectedBiome:'cerrado',stage:'cell',cell:null,mouse:{x:0,y:0,down:false},keys:{},camera:{x:0,y:0,zoom:1},world:{},player:null,species:null,nearby:[],plants:[],animals:[],buildings:[],particles:[],floating:[],lineage:[],discoveries:new Set(),weather:'clear',weatherTimer:0,weatherTicks:0,objective:null,activeTab:'overview',autosaveTimer:0};
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function rand(){Game.seed=(Game.seed*1664525+1013904223)>>>0;return Game.seed/4294967296;}
 function randi(a,b){return Math.floor(rand()*(b-a+1))+a;}
@@ -83,6 +83,240 @@ UISystem.description="Updates HUD, modals, dashboard tabs, logs, objectives, and
 // ===== RENDERSYSTEM =====
 const RenderSystem={};
 RenderSystem.description="Draws a pixel-art scene with depth layers, weather, particles, lighting, and responsive camera.";
+
+// ===== CELLSYSTEM =====
+const CellSystem={};
+CellSystem.description="Primeiro estágio da linhagem: uma célula simples coleta energia, DNA e escolhe as adaptações que definem os caminhos animal, vegetal e aquático.";
+CellSystem.mutations=[
+  {id:'flagellum',name:'Flagelo',branch:'neutral',cost:12,desc:'Um primeiro motor biológico. A célula ganha velocidade e controle.',effect:{mobility:18}},
+  {id:'membrane',name:'Membrana reforçada',branch:'neutral',cost:15,desc:'Suporta impactos, toxinas e mudanças bruscas no meio.',effect:{membrane:22}},
+  {id:'phagocytosis',name:'Fagocitose',branch:'animal',cost:18,desc:'Engole partículas e outras células. É a primeira grande tendência para uma linhagem animal.',effect:{animal:2,feeding:22}},
+  {id:'photosynthesis',name:'Fotossíntese primitiva',branch:'plant',cost:18,desc:'Passa a transformar luz em energia. Abre a tendência vegetal.',effect:{plant:2,photosynthesis:18}},
+  {id:'chemoreceptors',name:'Quimiorreceptores',branch:'neutral',cost:16,desc:'Percebe nutrientes e perigos próximos antes do contato.',effect:{sense:24}},
+  {id:'cilia',name:'Cílios motores',branch:'animal',cost:20,desc:'Movimento fino e rápido em ambientes aquáticos.',requires:['flagellum'],effect:{animal:1,mobility:20}},
+  {id:'vacuole',name:'Vacúolo de reserva',branch:'neutral',cost:22,desc:'Armazena mais água e energia para atravessar períodos ruins.',effect:{storage:28}},
+  {id:'chloroplasts',name:'Cloroplastos estáveis',branch:'plant',cost:25,desc:'A fotossíntese se torna eficiente e a linhagem vegetal ganha força.',requires:['photosynthesis'],effect:{plant:2,photosynthesis:28}},
+  {id:'toxin',name:'Toxina celular',branch:'animal',cost:25,desc:'Defesa química que também favorece estratégias predatórias.',requires:['phagocytosis'],effect:{animal:1,toxin:26}},
+  {id:'nucleus',name:'Núcleo complexo',branch:'neutral',cost:30,desc:'Organiza o material genético e permite saltos evolutivos maiores.',requiresCount:3,effect:{complexity:35}},
+  {id:'multicellular',name:'Multicelularidade',branch:'neutral',cost:45,desc:'Células passam a cooperar. A linhagem deixa o estágio microscópico.',requires:['nucleus'],requiresCount:5,final:true,effect:{complexity:60}}
+];
+CellSystem.init=function(){
+  Game.stage='cell';
+  document.body.classList.add('cell-stage');
+  Game.world={};
+  Game.plants=[];Game.animals=[];Game.buildings=[];
+  const w=canvas.width,h=canvas.height;
+  Game.cell={
+    x:w*.5,y:h*.5,radius:18,
+    hp:100,hpMax:100,energy:72,energyMax:100,water:100,waterMax:100,
+    mobility:16,membrane:8,feeding:8,photosynthesis:0,sense:8,storage:0,toxin:0,complexity:0,
+    animal:0,plant:0,age:0,pulse:0,feedCooldown:0,
+    particles:[],hazards:[],absorbed:0
+  };
+  Game.player={id:'cell_0',x:Game.cell.x,y:Game.cell.y,hp:100,energy:72,water:100,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
+  for(let i=0;i<95;i++)CellSystem.spawnParticle();
+  for(let i=0;i<12;i++)CellSystem.spawnHazard();
+  Game.species.history.push('A primeira célula da linhagem surgiu em águas primitivas.');
+  Game.lineage=[{id:'cell_origin',name:Game.species.name,generation:0,biome:'micro',parents:[],note:'Origem unicelular.'}];
+  Game.discoveries=new Set();
+  CellSystem.refreshObjective();
+};
+CellSystem.spawnParticle=function(){
+  if(!Game.cell)return;
+  const margin=24;
+  const roll=rand();
+  const type=roll<.54?'nutrient':roll<.78?'mineral':roll<.94?'light':'dna';
+  const colors={nutrient:'#e3a45b',mineral:'#6cc6c0',light:'#90d96d',dna:'#86a8ff'};
+  const values={nutrient:2,mineral:1,light:1,dna:5};
+  Game.cell.particles.push({
+    x:margin+rand()*Math.max(1,canvas.width-margin*2),
+    y:margin+rand()*Math.max(1,canvas.height-margin*2),
+    vx:(rand()-.5)*9,vy:(rand()-.5)*9,
+    r:type==='dna'?5:3+randi(0,3),type,color:colors[type],value:values[type]
+  });
+};
+CellSystem.spawnHazard=function(){
+  if(!Game.cell)return;
+  Game.cell.hazards.push({
+    x:30+rand()*Math.max(1,canvas.width-60),
+    y:30+rand()*Math.max(1,canvas.height-60),
+    vx:(rand()-.5)*14,vy:(rand()-.5)*14,r:5+randi(0,5),phase:rand()*6.28
+  });
+};
+CellSystem.path=function(){
+  const cell=Game.cell||{};
+  if((cell.plant||0)>(cell.animal||0)+1)return 'vegetal';
+  if((cell.animal||0)>(cell.plant||0)+1)return 'animal';
+  if((cell.plant||0)>0&&(cell.animal||0)>0)return 'mixotrófica';
+  return 'indefinida';
+};
+CellSystem.canBuy=function(m){
+  const owned=Game.species.mutations||[];
+  if(owned.includes(m.id))return {ok:false,reason:'Adquirida'};
+  if(Game.species.dna<m.cost)return {ok:false,reason:'DNA insuficiente'};
+  if(m.requires&&m.requires.some(id=>!owned.includes(id)))return {ok:false,reason:'Falta: '+m.requires.map(id=>CellSystem.mutations.find(x=>x.id===id)?.name||id).join(', ')};
+  if(m.requiresCount&&owned.filter(id=>CellSystem.mutations.some(x=>x.id===id&&x.id!=='multicellular')).length<m.requiresCount)return {ok:false,reason:'Adquira '+m.requiresCount+' adaptações celulares'};
+  return {ok:true,reason:''};
+};
+CellSystem.buy=function(id){
+  const m=CellSystem.mutations.find(x=>x.id===id);if(!m)return false;
+  const check=CellSystem.canBuy(m);if(!check.ok){say(check.reason);return false;}
+  Game.species.dna-=m.cost;Game.species.mutations.push(m.id);
+  for(const[k,v]of Object.entries(m.effect||{}))Game.cell[k]=(Game.cell[k]||0)+v;
+  if(m.id==='vacuole'){Game.cell.energyMax+=24;Game.cell.waterMax+=18;}
+  if(m.id==='membrane'){Game.cell.hpMax+=22;Game.cell.hp=Math.min(Game.cell.hpMax,Game.cell.hp+22);}
+  Game.species.history.push('Célula: '+m.name);
+  say('Mutação adquirida: '+m.name);
+  if(m.final){CellSystem.transition();return true;}
+  CellSystem.refreshObjective();return true;
+};
+CellSystem.absorb=function(){
+  const cell=Game.cell;if(!cell||cell.feedCooldown>0)return;
+  cell.feedCooldown=.28;
+  let consumed=0;
+  for(let i=cell.particles.length-1;i>=0;i--){
+    const p=cell.particles[i],d=Math.hypot(p.x-cell.x,p.y-cell.y);
+    const reach=cell.radius+14+(cell.sense||0)*.16;
+    if(d>reach)continue;
+    if(p.type==='light'&&cell.photosynthesis<=0)continue;
+    const feedBoost=1+(cell.feeding||0)/90;
+    if(p.type==='nutrient'){cell.energy=clamp(cell.energy+10*feedBoost,0,cell.energyMax);Game.species.biomass+=2;Game.species.dna+=2*feedBoost;}
+    else if(p.type==='mineral'){cell.energy=clamp(cell.energy+3,0,cell.energyMax);Game.species.dna+=1;}
+    else if(p.type==='light'){cell.energy=clamp(cell.energy+7+(cell.photosynthesis||0)*.16,0,cell.energyMax);Game.species.dna+=1.2;}
+    else if(p.type==='dna'){Game.species.dna+=p.value;cell.energy=clamp(cell.energy+4,0,cell.energyMax);}
+    cell.particles.splice(i,1);consumed++;cell.absorbed++;
+    if(consumed>=4)break;
+  }
+  if(consumed){say('Absorção celular • +DNA');}
+};
+CellSystem.update=function(dt){
+  const cell=Game.cell;if(!cell)return;
+  cell.age+=dt;cell.pulse+=dt;cell.feedCooldown-=dt;
+  const ix=(Game.keys.a||Game.keys.ArrowLeft?-1:0)+(Game.keys.d||Game.keys.ArrowRight?1:0);
+  const iy=(Game.keys.w||Game.keys.ArrowUp?-1:0)+(Game.keys.s||Game.keys.ArrowDown?1:0);
+  let mx=ix,my=iy;
+  if(mx||my){
+    const len=Math.hypot(mx,my)||1;mx/=len;my/=len;
+    const speed=75+(cell.mobility||0)*2.3;
+    cell.x=clamp(cell.x+mx*speed*dt,cell.radius,canvas.width-cell.radius);
+    cell.y=clamp(cell.y+my*speed*dt,cell.radius,canvas.height-cell.radius);
+    cell.energy-=dt*(1.8-Math.min(.7,(cell.mobility||0)/100));
+  }
+  const photo=cell.photosynthesis>0?(1.1+(cell.photosynthesis||0)*.025):0;
+  cell.energy=clamp(cell.energy+photo*dt-.55*dt,0,cell.energyMax);
+  cell.water=clamp(cell.water-.04*dt,0,cell.waterMax);
+  if(cell.energy<=0)cell.hp-=8*dt;
+  if(cell.hp<=0){
+    cell.hp=cell.hpMax*.65;cell.energy=cell.energyMax*.45;cell.x=canvas.width*.5;cell.y=canvas.height*.5;
+    Game.species.dna=Math.max(0,Game.species.dna-8);say('A célula quase morreu. Parte do DNA acumulado foi perdida.');
+  }
+  for(const p of cell.particles){
+    p.x+=p.vx*dt;p.y+=p.vy*dt;
+    if(p.x<5||p.x>canvas.width-5)p.vx*=-1;if(p.y<5||p.y>canvas.height-5)p.vy*=-1;
+  }
+  for(const h of cell.hazards){
+    h.phase+=dt;h.x+=h.vx*dt;h.y+=h.vy*dt;
+    if(h.x<8||h.x>canvas.width-8)h.vx*=-1;if(h.y<8||h.y>canvas.height-8)h.vy*=-1;
+    if(Math.hypot(h.x-cell.x,h.y-cell.y)<h.r+cell.radius*.72){
+      const protection=clamp((cell.membrane||0)/80,0,.7);
+      cell.hp-=dt*14*(1-protection);cell.energy-=dt*3;
+    }
+  }
+  if(cell.photosynthesis>0&&rand()<dt*.9)Game.species.dna+=dt*.22*(1+cell.photosynthesis/50);
+  while(cell.particles.length<95)CellSystem.spawnParticle();
+  while(cell.hazards.length<12)CellSystem.spawnHazard();
+  Game.player.x=cell.x;Game.player.y=cell.y;Game.player.hp=cell.hp;Game.player.energy=cell.energy;Game.player.water=cell.water;
+  CellSystem.refreshObjective();
+};
+CellSystem.refreshObjective=function(){
+  if(!Game.species||!Game.cell)return;
+  const owned=Game.species.mutations.filter(id=>CellSystem.mutations.some(m=>m.id===id));
+  const hasNucleus=owned.includes('nucleus');
+  UI.objectiveTitle.textContent=hasNucleus?'Prepare a multicelularidade':'Construa sua primeira célula';
+  UI.objectiveDesc.textContent=hasNucleus?'Acumule DNA e una suas células para iniciar um organismo complexo.':'Colete DNA e escolha adaptações. Suas escolhas já começam a definir animal, planta ou uma estratégia mista.';
+  UI.objectiveProgress.textContent=Math.min(owned.length,5)+' / 5 adaptações';
+  const bar=UI.objectiveProgress.parentElement?.querySelector('em');if(bar)bar.style.width=clamp(owned.length/5*100,0,100)+'%';
+};
+CellSystem.draw=function(){
+  const cell=Game.cell;
+  ctx.fillStyle='#061a20';ctx.fillRect(0,0,canvas.width,canvas.height);
+  const grad=ctx.createRadialGradient(canvas.width*.52,canvas.height*.42,20,canvas.width*.52,canvas.height*.42,Math.max(canvas.width,canvas.height)*.72);
+  grad.addColorStop(0,'rgba(30,104,111,.32)');grad.addColorStop(.55,'rgba(10,54,64,.18)');grad.addColorStop(1,'rgba(2,14,20,.72)');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  for(let i=0;i<34;i++){
+    const x=(i*173+Game.time*7)%canvas.width,y=(i*97+Math.sin(Game.time*.2+i)*34+canvas.height)%canvas.height;
+    ctx.fillStyle='rgba(128,213,202,.045)';ctx.beginPath();ctx.arc(x,y,8+(i%5)*3,0,Math.PI*2);ctx.fill();
+  }
+  for(const p of cell.particles){
+    ctx.globalAlpha=p.type==='light'?.72:.9;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    if(p.type==='dna'){ctx.strokeStyle='rgba(180,198,255,.65)';ctx.beginPath();ctx.arc(p.x,p.y,p.r+3,0,Math.PI*2);ctx.stroke();}
+  }
+  ctx.globalAlpha=1;
+  for(const h of cell.hazards){
+    const rr=h.r+Math.sin(h.phase*2)*2;ctx.fillStyle='rgba(187,74,91,.68)';ctx.beginPath();ctx.arc(h.x,h.y,rr,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(255,150,155,.32)';ctx.beginPath();ctx.arc(h.x,h.y,rr+4,0,Math.PI*2);ctx.stroke();
+  }
+  const path=CellSystem.path();const base=path==='vegetal'?'#6fbd75':path==='animal'?'#d28b62':'#70b9b8';
+  ctx.shadowColor=base;ctx.shadowBlur=18;ctx.fillStyle=base;ctx.beginPath();ctx.arc(cell.x,cell.y,cell.radius+Math.sin(cell.pulse*3)*1.5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;ctx.strokeStyle='rgba(225,255,244,.7)';ctx.lineWidth=Math.max(2,2+(cell.membrane||0)/28);ctx.beginPath();ctx.arc(cell.x,cell.y,cell.radius+2,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(17,55,59,.72)';ctx.beginPath();ctx.arc(cell.x-4,cell.y-2,cell.radius*.42,0,Math.PI*2);ctx.fill();
+  if(Game.species.mutations.includes('nucleus')){ctx.fillStyle='#8f78c9';ctx.beginPath();ctx.arc(cell.x-3,cell.y-2,cell.radius*.24,0,Math.PI*2);ctx.fill();}
+  if(Game.species.mutations.includes('flagellum')){
+    ctx.strokeStyle='#8ee0ca';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(cell.x-cell.radius,cell.y);ctx.bezierCurveTo(cell.x-36,cell.y-18+Math.sin(Game.time*8)*8,cell.x-50,cell.y+18,cell.x-68,cell.y+Math.sin(Game.time*6)*14);ctx.stroke();
+  }
+  if(Game.species.mutations.includes('cilia')){
+    ctx.strokeStyle='rgba(173,235,219,.65)';ctx.lineWidth=1.5;
+    for(let i=0;i<14;i++){const a=i/14*Math.PI*2;ctx.beginPath();ctx.moveTo(cell.x+Math.cos(a)*(cell.radius+2),cell.y+Math.sin(a)*(cell.radius+2));ctx.lineTo(cell.x+Math.cos(a)*(cell.radius+8),cell.y+Math.sin(a)*(cell.radius+8));ctx.stroke();}
+  }
+  if(Game.species.mutations.includes('chloroplasts')){
+    ctx.fillStyle='#95dc6e';for(let i=0;i<5;i++){const a=i/5*Math.PI*2+Game.time*.15;ctx.beginPath();ctx.arc(cell.x+Math.cos(a)*cell.radius*.58,cell.y+Math.sin(a)*cell.radius*.58,3,0,Math.PI*2);ctx.fill();}
+  }
+  ctx.restore();
+  ctx.fillStyle='rgba(3,13,16,.7)';ctx.fillRect(18,18,310,68);
+  ctx.fillStyle='#d8f2e8';ctx.font='700 14px system-ui';ctx.fillText('ESTÁGIO CELULAR',32,43);
+  ctx.fillStyle='#88aaa5';ctx.font='12px system-ui';ctx.fillText('E absorver • Q evoluir • evite células tóxicas',32,65);
+  ctx.fillStyle='#a8e4c5';ctx.fillText('Tendência: '+path,32,82);
+};
+CellSystem.drawPortrait=function(target,x,y,size){
+  const cell=Game.cell||{membrane:0};const path=CellSystem.path();const base=path==='vegetal'?'#6fbd75':path==='animal'?'#d28b62':'#70b9b8';
+  target.save();target.translate(x,y);target.fillStyle=base;target.beginPath();target.arc(0,0,size*.36,0,Math.PI*2);target.fill();
+  target.strokeStyle='#c8efe2';target.lineWidth=2+Math.min(4,(cell.membrane||0)/20);target.stroke();
+  target.fillStyle='#193c3c';target.beginPath();target.arc(-size*.07,-size*.03,size*.14,0,Math.PI*2);target.fill();
+  if(Game.species?.mutations?.includes('nucleus')){target.fillStyle='#8f78c9';target.beginPath();target.arc(-size*.05,-size*.03,size*.075,0,Math.PI*2);target.fill();}
+  target.restore();
+};
+CellSystem.transition=function(){
+  const cell=Game.cell,path=CellSystem.path();
+  Game.stage='organism';document.body.classList.remove('cell-stage');
+  const plant=path==='vegetal';
+  const genes=normGenes({
+    body:plant?'plant':'fish',
+    color:plant?'#70a95e':'#6594a6',
+    size:.72,
+    speed:plant?0:36+(cell.mobility||0)*.28,
+    jump:plant?0:5,
+    swim:plant?0:58+(cell.mobility||0)*.35,
+    defense:22+(cell.membrane||0)*.35,
+    vision:20+(cell.sense||0)*.8,
+    feed:plant?10:38+(cell.feeding||0)*.6,
+    rootDepth:plant?48+(cell.storage||0)*.5:0,
+    leafArea:plant?44+(cell.photosynthesis||0)*.6:0,
+    toxin:cell.toxin||0,
+    intelligence:8+Math.round((cell.complexity||0)*.12)
+  });
+  Game.species.genes=genes;Game.species.type=plant?'Vegetal':'Aquático';Game.species.lifePath=path;Game.species.generation=1;
+  Game.species.history.push('Multicelularidade alcançada. Caminho inicial: '+path+'.');
+  WorldSystem.init();WeatherSystem.start();
+  Game.player={id:'hero_1',x:D.WORLD_W/2,y:D.WORLD_H/2,hp:genes.hpMax,energy:genes.energyMax,water:genes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
+  for(let tries=0;tries<800;tries++){const x=randi(6,D.WORLD_W-7),y=randi(6,D.WORLD_H-7);if(D.BIOME_ORDER[tile(x,y)]===Game.selectedBiome){Game.player.x=x+.5;Game.player.y=y+.5;break;}}
+  Game.lineage.push({id:'g1',name:Game.species.name,generation:1,biome:Game.selectedBiome,parents:['cell_origin'],genes:normGenes(genes),note:plant?'Primeiro organismo vegetal multicelular.':'Primeiro organismo animal aquático.'});
+  Game.discoveries=new Set([Game.selectedBiome]);
+  setModal(UI.evo,false);
+  say(plant?'A linhagem tornou-se um organismo vegetal multicelular.':'A linhagem tornou-se um organismo animal aquático.');
+  UISystem.refresh();
+};
+
 WorldSystem.init=function(){
   Game.world={w:D.WORLD_W,h:D.WORLD_H,grid:new Uint8Array(D.WORLD_W*D.WORLD_H),moisture:new Float32Array(D.WORLD_W*D.WORLD_H),height:new Float32Array(D.WORLD_W*D.WORLD_H),fertility:new Float32Array(D.WORLD_W*D.WORLD_H)};
   for(let y=0;y<D.WORLD_H;y++){
@@ -143,13 +377,8 @@ BiomeSystem.at=function(x,y){const tx=clamp(Math.floor(x),0,D.WORLD_W-1),ty=clam
 BiomeSystem.habitat=function(g,x,y){const b=this.at(x,y);const temp=b.temp+WeatherSystem.tempOffset();const heat=g.heat||40,cold=g.cold||40;const tempFit=100-Math.min(100,Math.abs(temp-24)*2.4);const waterFit=clamp((b.water+g.drought-35),0,100);return clamp((tempFit+(waterFit)+((g.speed||0))/3)/2.3,0,100);};
 BiomeSystem.discover=function(biomeId){if(Game.discoveries.has(biomeId))return;Game.discoveries.add(biomeId);Game.species.dna+=35;say('Novo bioma descoberto: '+D.BIOMES[biomeId].name+' • +35 DNA');};
 EvolutionSystem.newSpecies=function(name,biome){
-  const genes=normGenes({body:'quadruped',color:['#799c53','#b47b52','#6594a6','#9e8b54'][randi(0,3)],size:1.0,speed:48,jump:18,vision:52});
-  Game.species={name:name||'Carijó',type:'Terrestre',genes,dna:120,biomass:12,stone:28,population:1,generation:1,knowledge:0,culture:0,technology:0,settlementLevel:0,relations:{},inventory:{madeira:30,pedra:28,agua:55,frutas:24,sementes:14,fibras:12,argila:5,minerio:0,carne:4,peixe:0},mutations:[],unlockedTech:['stone'],season:1,foodMemory:0,explored:[],history:['A linhagem nasceu em '+D.BIOMES[biome].name+'.']};
-  Game.player={id:'hero_1',x:D.WORLD_W/2,y:D.WORLD_H/2,hp:genes.hpMax,energy:genes.energyMax,water:genes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
-  // relocate player to a matching tile
-  for(let tries=0;tries<800;tries++){const x=randi(6,D.WORLD_W-7),y=randi(6,D.WORLD_H-7);if(D.BIOME_ORDER[tile(x,y)]===biome){Game.player.x=x+.5;Game.player.y=y+.5;break;}}
-  Game.lineage=[{id:'g1',name:Game.species.name,generation:1,biome,parents:[],note:'Fundação da linhagem.'}];
-  Game.discoveries=new Set([biome]);
+  const genes=normGenes({body:'cell',color:'#70b9b8',size:.35,speed:16,jump:0,swim:18,vision:8,defense:8});
+  Game.species={name:name||'Carijó',type:'Célula primitiva',lifePath:'indefinida',genes,dna:18,biomass:0,stone:0,population:1,generation:0,knowledge:0,culture:0,technology:0,settlementLevel:0,relations:{},inventory:{madeira:0,pedra:0,agua:0,frutas:0,sementes:0,fibras:0,argila:0,minerio:0,carne:0,peixe:0},mutations:[],unlockedTech:[],season:1,foodMemory:0,explored:[],history:['A linhagem começou como uma célula simples. Bioma de destino: '+D.BIOMES[biome].name+'.']};
 };
 EvolutionSystem.mutateChild=function(mother,father){
   const keys=['speed','jump','climb','dig','swim','flight','vision','hearing','smell','perception','hunt','collect','feed','fertility','cold','heat','drought','defense','hpMax','energyMax','waterMax','intelligence','social','build'];
@@ -163,6 +392,15 @@ EvolutionSystem.buy=function(id){const m=D.MUTATIONS.find(x=>x.id===id);if(!m||G
 PlayerSystem={};
 PlayerSystem.update=function(dt){
   const p=Game.player,g=Game.species.genes;if(!p||!p.alive)return;
+  if(g.body==='plant'){
+    const b=BiomeSystem.at(p.x,p.y);const sun=Math.max(.12,Math.sin((Game.hour/24)*Math.PI));
+    p.energy=clamp(p.energy+dt*(.7+sun*(g.leafArea||30)*.018)-dt*.25,0,g.energyMax||100);
+    p.water=clamp(p.water+dt*(b.water*.012+(g.rootDepth||0)*.012)-dt*.35,0,g.waterMax||100);
+    p.age+=dt*.04;p.foodCooldown-=dt;p.mateCooldown-=dt;p.attackCooldown-=dt;
+    if(!Game.discoveries.has(b.id))BiomeSystem.discover(b.id);
+    if(p.energy<=0||p.water<=0)p.hp-=dt*1.2;else p.hp=clamp(p.hp+dt*.16,0,g.hpMax||100);
+    if(p.hp<=0)this.die();return;
+  }
   const ix=(Game.keys.a||Game.keys.ArrowLeft?-1:0)+(Game.keys.d||Game.keys.ArrowRight?1:0);const iy=(Game.keys.w||Game.keys.ArrowUp?-1:0)+(Game.keys.s||Game.keys.ArrowDown?1:0);
   let mx=ix,my=iy;if(mx||my){const len=Math.hypot(mx,my);mx/=len;my/=len;p.facing=mx<0?-1:mx>0?1:p.facing;const biome=BiomeSystem.at(p.x,p.y);const speed=(g.speed||48)/42*D.TILE*dt*biome.movement;p.x=clamp(p.x+mx*speed/D.TILE,.8,D.WORLD_W-.8);p.y=clamp(p.y+my*speed/D.TILE,.8,D.WORLD_H-.8);p.energy=clamp(p.energy-dt*(.5+(g.energyDrain||.035)*20)* (mx||my?1.8:1),0,g.energyMax||100);}
   p.energy=clamp(p.energy-dt*(g.energyDrain||.035)*5,0,g.energyMax||100);p.water=clamp(p.water-dt*(g.waterDrain||.018)*4,0,g.waterMax||100);p.age+=dt*.06;p.foodCooldown-=dt;p.mateCooldown-=dt;p.attackCooldown-=dt;
@@ -171,8 +409,8 @@ PlayerSystem.update=function(dt){
   if(rand()<dt*.08)ResourceSystem.collectNearby();
 };
 PlayerSystem.die=function(){if(!Game.player.alive)return;Game.player.alive=false;say('Sua linhagem perdeu o indivíduo. Se houver descendentes, você assumirá o próximo.');setTimeout(()=>ReproductionSystem.takeOverDescendant(),900);};
-PlayerSystem.eat=function(){if(Game.player.foodCooldown>0)return;const target=ResourceSystem.nearestFood();if(target){const f=D.FOOD.fruta;Game.player.energy=clamp(Game.player.energy+f.energy,0,Game.species.genes.energyMax);Game.player.water=clamp(Game.player.water+f.water,0,Game.species.genes.waterMax);Game.species.dna+=f.dna;Game.species.biomass+=f.biomass;target.growth=Math.max(0,target.growth-18);Game.player.foodCooldown=2.8;spawnFloat('+'+f.energy+' energia',Game.player.x,Game.player.y,'good');}}
-PlayerSystem.attack=function(){if(Game.player.attackCooldown>0)return;const prey=Game.animals.filter(a=>dist(a,Game.player)<2.0).sort((a,b)=>dist(a,Game.player)-dist(b,Game.player))[0];if(!prey){say('Nenhum animal ao alcance.');return;}const dmg=Math.max(2,(Game.species.genes.speed||40)*.18+(Game.species.genes.defense||20)*.08+randi(2,8));prey.hp=(prey.hp||24)-dmg;Game.player.attackCooldown=1.1;spawnFloat('-'+Math.round(dmg),prey.x,prey.y,'bad');if(prey.hp<=0){const gain=5+Math.floor((D.ANIMALS[prey.species]?.attack||10)/8);Game.species.dna+=gain;Game.species.inventory.carne=(Game.species.inventory.carne||0)+1;say('Caça bem-sucedida • +'+gain+' DNA');Game.animals.splice(Game.animals.indexOf(prey),1);}}
+PlayerSystem.eat=function(){if(Game.species.genes.body==='plant'){if(Game.player.foodCooldown>0)return;Game.player.energy=clamp(Game.player.energy+12,0,Game.species.genes.energyMax);Game.player.water=clamp(Game.player.water+10,0,Game.species.genes.waterMax);Game.species.dna+=2;Game.player.foodCooldown=2;say('Fotossíntese e absorção radicular • +2 DNA');return;}if(Game.player.foodCooldown>0)return;const target=ResourceSystem.nearestFood();if(target){const f=D.FOOD.fruta;Game.player.energy=clamp(Game.player.energy+f.energy,0,Game.species.genes.energyMax);Game.player.water=clamp(Game.player.water+f.water,0,Game.species.genes.waterMax);Game.species.dna+=f.dna;Game.species.biomass+=f.biomass;target.growth=Math.max(0,target.growth-18);Game.player.foodCooldown=2.8;spawnFloat('+'+f.energy+' energia',Game.player.x,Game.player.y,'good');}}
+PlayerSystem.attack=function(){if(Game.species.genes.body==='plant'){say((Game.species.genes.toxin||0)>0?'A planta libera compostos defensivos.':'Esta linhagem vegetal ainda não possui defesa ativa.');return;}if(Game.player.attackCooldown>0)return;const prey=Game.animals.filter(a=>dist(a,Game.player)<2.0).sort((a,b)=>dist(a,Game.player)-dist(b,Game.player))[0];if(!prey){say('Nenhum animal ao alcance.');return;}const dmg=Math.max(2,(Game.species.genes.speed||40)*.18+(Game.species.genes.defense||20)*.08+randi(2,8));prey.hp=(prey.hp||24)-dmg;Game.player.attackCooldown=1.1;spawnFloat('-'+Math.round(dmg),prey.x,prey.y,'bad');if(prey.hp<=0){const gain=5+Math.floor((D.ANIMALS[prey.species]?.attack||10)/8);Game.species.dna+=gain;Game.species.inventory.carne=(Game.species.inventory.carne||0)+1;say('Caça bem-sucedida • +'+gain+' DNA');Game.animals.splice(Game.animals.indexOf(prey),1);}}
 PlantSystem.update=function(dt){
   for(const p of Game.plants){
     const b=BiomeSystem.at(p.x,p.y);const weather=D.WEATHER[Game.weather];const sun=Math.max(0,Math.sin((Game.hour/24)*Math.PI));p.age+=dt*(.2+b.water*.004)*weather.plant; p.water=clamp(p.water+dt*(b.water*.08+weather.water*.02),0,120);p.growth=clamp(p.growth+dt*(b.water/80)*weather.plant*(.35+(Game.world.fertility[key(Math.floor(p.x),Math.floor(p.y))]||.5)),0,160); if(Game.weather==='fire'&&rand()<dt*.015)p.growth-=22;if(p.growth<8&&rand()<dt*.02)p.growth=0; if(p.growth<8&&rand()<dt*.08)p.growth=20+rand()*50;
@@ -205,7 +443,15 @@ AnimalAISystem.update=function(dt){
 };
 ReproductionSystem.spawnWildChild=function(parent){const child=Object.assign({},parent,{id:'a_'+Math.random().toString(36).slice(2),x:parent.x+(rand()-.5),y:parent.y+(rand()-.5),age:0,hunger:10,energy:80});child.genes=normGenes(parent.genes);Game.animals.push(child);};
 ReproductionSystem.tryBreed=function(){
-  const p=Game.player,g=Game.species.genes;if(p.mateCooldown>0)return;const mate=Game.animals.find(a=>dist(a,p)<1.8&&a.role!=='predador');if(!mate){say('Procure um parceiro compatível próximo.');return;}if(p.energy<30||p.water<25){say('Você precisa de energia e água para reproduzir.');return;}p.energy-=18;p.water-=8;p.mateCooldown=7;const childGenes=EvolutionSystem.mutateChild(g,mate.genes);const child={id:'desc_'+(Game.lineage.length+1),name:Game.species.name+' • '+(Game.lineage.length+1),genes:childGenes,generation:Game.species.generation+1,parents:[Game.player.id,mate.id],bornDay:Game.day};Game.lineage.push(child);Game.species.population+=1;Game.species.dna+=28;Game.species.generation=Math.max(Game.species.generation,child.generation);Game.player=Object.assign({hp:childGenes.hpMax,energy:childGenes.energyMax,water:childGenes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0}, {id:child.id,x:p.x+.7,y:p.y+.4});Game.species.genes=childGenes;if(childGenes._mutation){const m=D.MUTATIONS.find(x=>x.id===childGenes._mutation);if(m&&!Game.species.mutations.includes(m.id))Game.species.mutations.push(m.id);say('Nasceu um descendente com mutação: '+(m?m.name:childGenes._mutation));}else say('Nova geração assumida: geração '+child.generation);return true;
+  const p=Game.player,g=Game.species.genes;
+  if(g.body==='plant'){
+    if(p.mateCooldown>0)return;
+    if(p.energy<38||p.water<35){say('A planta precisa acumular energia e água antes de produzir sementes.');return;}
+    p.energy-=22;p.water-=12;p.mateCooldown=8;Game.species.population+=1;Game.species.dna+=18;Game.species.generation+=1;
+    Game.lineage.push({id:'seed_'+Game.lineage.length,name:Game.species.name+' • semente '+Game.species.generation,generation:Game.species.generation,parents:[p.id],genes:normGenes(g),biome:BiomeSystem.at(p.x,p.y).id,note:'Nova geração vegetal por dispersão de sementes.'});
+    say('Sementes dispersas • nova geração vegetal • +18 DNA');return true;
+  }
+  if(p.mateCooldown>0)return;const mate=Game.animals.find(a=>dist(a,p)<1.8&&a.role!=='predador');if(!mate){say('Procure um parceiro compatível próximo.');return;}if(p.energy<30||p.water<25){say('Você precisa de energia e água para reproduzir.');return;}p.energy-=18;p.water-=8;p.mateCooldown=7;const childGenes=EvolutionSystem.mutateChild(g,mate.genes);const child={id:'desc_'+(Game.lineage.length+1),name:Game.species.name+' • '+(Game.lineage.length+1),genes:childGenes,generation:Game.species.generation+1,parents:[Game.player.id,mate.id],bornDay:Game.day};Game.lineage.push(child);Game.species.population+=1;Game.species.dna+=28;Game.species.generation=Math.max(Game.species.generation,child.generation);Game.player=Object.assign({hp:childGenes.hpMax,energy:childGenes.energyMax,water:childGenes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0}, {id:child.id,x:p.x+.7,y:p.y+.4});Game.species.genes=childGenes;if(childGenes._mutation){const m=D.MUTATIONS.find(x=>x.id===childGenes._mutation);if(m&&!Game.species.mutations.includes(m.id))Game.species.mutations.push(m.id);say('Nasceu um descendente com mutação: '+(m?m.name:childGenes._mutation));}else say('Nova geração assumida: geração '+child.generation);return true;
 };
 ReproductionSystem.takeOverDescendant=function(){const child=Game.lineage.slice().reverse().find(x=>x.genes&&!x.taken);if(!child){say('A linhagem acabou. Pressione R para tentar reconstruir a população.');return;}child.taken=true;Game.player={id:child.id,x:Game.player?.x||D.WORLD_W/2,y:Game.player?.y||D.WORLD_H/2,hp:child.genes.hpMax,energy:child.genes.energyMax,water:child.genes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};Game.species.genes=normGenes(child.genes);Game.species.generation=child.generation;say('Você assumiu o controle de '+child.name+'.');};
 
@@ -231,7 +477,7 @@ RenderSystem.drawWorld=function(){
   for(const b of Game.buildings){if(Math.abs(b.x-p.x)<cols/2&&Math.abs(b.y-p.y)<rows/2){const s=this.worldToScreen(b.x+.5,b.y+.5);drawBuildingSprite(s.x,s.y,b.id);}}
   for(const plant of Game.plants){if(plant.growth<8)continue;if(Math.abs(plant.x-p.x)>cols/2||Math.abs(plant.y-p.y)>rows/2)continue;const s=this.worldToScreen(plant.x,plant.y);const spec=D.PLANTS[plant.species];SP.drawPlant(ctx,s.x,s.y,D.TILE*.7,spec,Game.time*.05);}
   for(const a of Game.animals){if(Math.abs(a.x-p.x)>cols/2||Math.abs(a.y-p.y)>rows/2)continue;const s=this.worldToScreen(a.x,a.y);SP.drawAnimal(ctx,s.x,s.y,D.TILE*.62,D.ANIMALS[a.species],{attack:a.state==='hunt'});}
-  const me=this.worldToScreen(p.x,p.y);SP.drawPlayer(ctx,me.x,me.y,D.TILE*.78,Game.species.genes,{facing:p.facing,shadow:true});
+  const me=this.worldToScreen(p.x,p.y);if(Game.species.genes.body==='plant'){ctx.save();ctx.fillStyle='rgba(0,0,0,.24)';ctx.beginPath();ctx.ellipse(me.x,me.y+13,22,7,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#6d8b4d';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(me.x,me.y+12);ctx.lineTo(me.x,me.y-18);ctx.stroke();ctx.fillStyle='#78b966';for(const a of [-2.3,-1.15,-.1,1.05]){ctx.beginPath();ctx.ellipse(me.x+Math.cos(a)*13,me.y-8+Math.sin(a)*8,11,5,a,0,Math.PI*2);ctx.fill();}ctx.fillStyle='#d5b45d';ctx.beginPath();ctx.arc(me.x,me.y-22,7,0,Math.PI*2);ctx.fill();ctx.restore();}else SP.drawPlayer(ctx,me.x,me.y,D.TILE*.78,Game.species.genes,{facing:p.facing,shadow:true});
   drawWeatherParticles();drawNightTint();drawFloating();
 };
 function drawBuildingSprite(x,y,id){ctx.save();ctx.imageSmoothingEnabled=false;const s=D.TILE*.9;const d={shelter:'#8b6948',campfire:'#d88a42',storage:'#9b744b',farm:'#6a9854',fence:'#876b4c',bridge:'#846747',workshop:'#79684e',tower:'#817258',house:'#8e7756',dock:'#657d89'}[id]||'#816';ctx.fillStyle=shadeColor(d,-22);ctx.fillRect(x-s*.35,y-s*.30,s*.7,s*.55);ctx.fillStyle=d;ctx.fillRect(x-s*.3,y-s*.22,s*.6,s*.42);if(id==='campfire')SP.pixelIcon(ctx,x,y-s*.05,15,'#f3b44f','fire');if(id==='farm'){ctx.fillStyle='#99b95d';for(let i=-2;i<=2;i++)ctx.fillRect(x+i*6,y+s*.12,3,7);}ctx.restore();}
@@ -241,27 +487,52 @@ function drawWeatherParticles(){if(Game.weather==='rain'||Game.weather==='storm'
 function spawnFloat(text,x,y,kind){Game.floating.push({text,x,y,ttl:1.1,kind});if(Game.floating.length>28)Game.floating.shift();}
 function drawFloating(){for(let i=Game.floating.length-1;i>=0;i--){const f=Game.floating[i];f.ttl-=.016;const s=RenderSystem.worldToScreen(f.x,f.y);ctx.save();ctx.globalAlpha=Math.max(0,f.ttl);ctx.fillStyle=f.kind==='bad'?'#e07666':'#b9e58d';ctx.font='900 12px monospace';ctx.fillText(f.text,s.x+6,s.y-f.ttl*34);ctx.restore();if(f.ttl<=0)Game.floating.splice(i,1);}}
 UISystem.startScreen=function(){const wrap=$('start-biomes');wrap.innerHTML='';D.BIOME_ORDER.forEach((id,i)=>{const b=D.BIOMES[id];const el=document.createElement('button');el.className='biome-choice'+(id===Game.selectedBiome?' selected':'');el.innerHTML=`<span class="biome-icon">${b.icon}</span><strong>${b.name}</strong><small>${b.desc}</small>`;el.onclick=()=>{Game.selectedBiome=id;document.querySelectorAll('.biome-choice').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');};wrap.appendChild(el);});};
-UISystem.refresh=function(){if(!Game.species||!Game.player)return;const g=Game.species.genes,p=Game.player,b=BiomeSystem.at(p.x,p.y);UI.species.textContent=Game.species.name;UI.type.textContent=(g.body==='fish'?'AQUÁTICO':g.body==='bird'?'VOADOR':'TERRESTRE');UI.generation.textContent='Geração '+Game.species.generation;UI.dna.textContent=Math.floor(Game.species.dna);UI.biomass.textContent=Math.floor(Game.species.biomass);UI.stone.textContent=Game.species.inventory.pedra||0;UI.population.textContent=Game.species.population;UI.hp.textContent=Math.round(p.hp);UI.energy.textContent=Math.round(p.energy);UI.water.textContent=Math.round(p.water);UI.barHp.style.width=clamp(p.hp/g.hpMax*100,0,100)+'%';UI.barEnergy.style.width=clamp(p.energy/g.energyMax*100,0,100)+'%';UI.barWater.style.width=clamp(p.water/g.waterMax*100,0,100)+'%';UI.speed.textContent=Math.round(g.speed);UI.defense.textContent=Math.round(g.defense);UI.jump.textContent=Math.round(g.jump);UI.vision.textContent=Math.round(g.vision);const habitat=Math.round(BiomeSystem.habitat(g,p.x,p.y));UI.polish.innerHTML=`<div class="ph-chip">BIOMA <b>${b.icon} ${b.name}</b></div><div class="ph-chip">CLIMA <b>${D.WEATHER[Game.weather].name}</b></div><div class="ph-chip">DIA <b>${Game.day}</b></div><div class="ph-chip">HABITAT <b>${habitat}%</b></div>`;UI.dashboardSubtitle.textContent=`${Game.species.name} • ${b.name}`;RenderSystem.drawPortraits();};
-RenderSystem.drawPortraits=function(){if(!Game.species)return;pctx.clearRect(0,0,pcanvas.width,pcanvas.height);evoCtx.clearRect(0,0,evoCanvas.width,evoCanvas.height);pctx.fillStyle='#0a160e';pctx.fillRect(0,0,pcanvas.width,pcanvas.height);evoCtx.fillStyle='#0a160e';evoCtx.fillRect(0,0,evoCanvas.width,evoCanvas.height);SP.drawPlayer(pctx,80,72,56,Game.species.genes,{facing:1});SP.drawPlayer(evoCtx,130,110,92,Game.species.genes,{facing:1});UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const box=$('gene-summary');box.innerHTML=['speed','defense','vision','heat','cold','drought','fertility','intelligence'].map(k=>`<div class="gene-pill">${k}<b>${Math.round(Game.species.genes[k]||0)}</b></div>`).join('');};
-UISystem.renderEvolution=function(){const g=Game.species.genes;UI.evoOptions.innerHTML='';for(const m of D.MUTATIONS){const owned=Game.species.mutations.includes(m.id);const el=document.createElement('article');el.className='evo-option';const effect=Object.entries(m.effect).filter(([,v])=>typeof v==='number').map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(' • ');el.innerHTML=`<h3>${m.name}</h3><p>${m.desc}</p><p>${effect}</p><footer><span class="cost">🧬 ${m.cost} DNA</span><button class="small-btn" ${owned?'disabled':''}>${owned?'ADQUIRIDA':'ADAPTAR'}</button></footer>`;el.querySelector('button').onclick=()=>{if(EvolutionSystem.buy(m.id)){UISystem.renderEvolution();UISystem.refresh();}};UI.evoOptions.appendChild(el);}}
+UISystem.refresh=function(){if(!Game.species||!Game.player)return;
+  if(Game.stage==='cell'){
+    const p=Game.player,cell=Game.cell,path=CellSystem.path();
+    UI.stageLabel.textContent='ESTÁGIO CELULAR';UI.species.textContent=Game.species.name;UI.type.textContent='CÉLULA • '+path.toUpperCase();UI.generation.textContent='Origem da linhagem';
+    UI.dna.textContent=Math.floor(Game.species.dna);UI.biomass.textContent=Math.floor(Game.species.biomass);UI.stone.textContent='—';UI.population.textContent='1';
+    UI.hp.textContent=Math.round(p.hp);UI.energy.textContent=Math.round(p.energy);UI.water.textContent=Math.round(p.water);
+    UI.barHp.style.width=clamp(p.hp/cell.hpMax*100,0,100)+'%';UI.barEnergy.style.width=clamp(p.energy/cell.energyMax*100,0,100)+'%';UI.barWater.style.width=clamp(p.water/cell.waterMax*100,0,100)+'%';
+    UI.speed.textContent=Math.round(cell.mobility);UI.defense.textContent=Math.round(cell.membrane);UI.jump.textContent=Math.round(cell.feeding+cell.photosynthesis);UI.vision.textContent=Math.round(cell.sense);
+    UI.polish.innerHTML=`<div class="ph-chip">FASE <b>🦠 CÉLULA</b></div><div class="ph-chip">CAMINHO <b>${path}</b></div><div class="ph-chip">ABSORÇÕES <b>${cell.absorbed}</b></div><div class="ph-chip">COMPLEXIDADE <b>${Math.round(cell.complexity)}%</b></div>`;
+    UI.dashboardSubtitle.textContent=`${Game.species.name} • estágio celular`;
+    if(UI.controlsHint)UI.controlsHint.textContent='WASD / setas para mover • E absorver • Q evoluir • Espaço pausar';
+    RenderSystem.drawPortraits();return;
+  }
+  const g=Game.species.genes,p=Game.player,b=BiomeSystem.at(p.x,p.y);UI.stageLabel.textContent=g.body==='plant'?'ORGANISMO VEGETAL':'ORGANISMO COMPLEXO';UI.species.textContent=Game.species.name;UI.type.textContent=(g.body==='plant'?'VEGETAL':g.body==='fish'?'AQUÁTICO':g.body==='bird'?'VOADOR':'TERRESTRE');UI.generation.textContent='Geração '+Game.species.generation;UI.dna.textContent=Math.floor(Game.species.dna);UI.biomass.textContent=Math.floor(Game.species.biomass);UI.stone.textContent=Game.species.inventory.pedra||0;UI.population.textContent=Game.species.population;UI.hp.textContent=Math.round(p.hp);UI.energy.textContent=Math.round(p.energy);UI.water.textContent=Math.round(p.water);UI.barHp.style.width=clamp(p.hp/g.hpMax*100,0,100)+'%';UI.barEnergy.style.width=clamp(p.energy/g.energyMax*100,0,100)+'%';UI.barWater.style.width=clamp(p.water/g.waterMax*100,0,100)+'%';UI.speed.textContent=Math.round(g.speed);UI.defense.textContent=Math.round(g.defense);UI.jump.textContent=Math.round(g.jump);UI.vision.textContent=Math.round(g.vision);const habitat=Math.round(BiomeSystem.habitat(g,p.x,p.y));UI.polish.innerHTML=`<div class="ph-chip">BIOMA <b>${b.icon} ${b.name}</b></div><div class="ph-chip">CLIMA <b>${D.WEATHER[Game.weather].name}</b></div><div class="ph-chip">DIA <b>${Game.day}</b></div><div class="ph-chip">HABITAT <b>${habitat}%</b></div>`;UI.dashboardSubtitle.textContent=`${Game.species.name} • ${b.name}`;if(UI.controlsHint)UI.controlsHint.textContent=g.body==='plant'?'E absorver • R dispersar sementes • Q evoluir • M mapa • L linhagem':'WASD / setas para mover • E comer • R reproduzir • Q evoluir • B construir • M mapa • L linhagem';RenderSystem.drawPortraits();};
+RenderSystem.drawPortraits=function(){if(!Game.species)return;pctx.clearRect(0,0,pcanvas.width,pcanvas.height);evoCtx.clearRect(0,0,evoCanvas.width,evoCanvas.height);pctx.fillStyle='#0a160e';pctx.fillRect(0,0,pcanvas.width,pcanvas.height);evoCtx.fillStyle='#0a160e';evoCtx.fillRect(0,0,evoCanvas.width,evoCanvas.height);if(Game.stage==='cell'){CellSystem.drawPortrait(pctx,80,72,56);CellSystem.drawPortrait(evoCtx,130,110,92);UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const cell=Game.cell;const box=$('gene-summary');box.innerHTML=[['mobilidade',cell.mobility],['membrana',cell.membrane],['alimentação',cell.feeding],['fotossíntese',cell.photosynthesis],['sentidos',cell.sense],['complexidade',cell.complexity]].map(([k,v])=>`<div class="gene-pill">${k}<b>${Math.round(v||0)}</b></div>`).join('');return;}SP.drawPlayer(pctx,80,72,56,Game.species.genes,{facing:1});SP.drawPlayer(evoCtx,130,110,92,Game.species.genes,{facing:1});UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const box=$('gene-summary');box.innerHTML=['speed','defense','vision','heat','cold','drought','fertility','intelligence'].map(k=>`<div class="gene-pill">${k}<b>${Math.round(Game.species.genes[k]||0)}</b></div>`).join('');};
+UISystem.renderEvolution=function(){
+  if(Game.stage==='cell'){
+    UI.evoTitle.textContent='LABORATÓRIO CELULAR';UI.evoOptions.innerHTML='';
+    const intro=document.createElement('div');intro.className='cell-evo-path';intro.innerHTML=`<strong>Caminho atual: ${CellSystem.path()}</strong><p>Não existe classe pronta. As mutações compradas aqui alteram o que sua linhagem poderá se tornar depois. Animal e vegetal são tendências construídas pelas escolhas.</p><div class="cell-particle-legend"><span>🟠 nutrientes</span><span>🟢 luz</span><span>🔵 DNA</span><span>🔴 perigo</span></div>`;UI.evoOptions.appendChild(intro);
+    for(const m of CellSystem.mutations){
+      const owned=Game.species.mutations.includes(m.id),check=CellSystem.canBuy(m),el=document.createElement('article');el.className='evo-option cell-mutation'+(!owned&&!check.ok?' locked':'');el.dataset.branch=m.branch;
+      const branch=m.branch==='plant'?'🌿 tendência vegetal':m.branch==='animal'?'🦠 tendência animal':'🧬 adaptação estrutural';
+      el.innerHTML=`<h3>${m.name}</h3><p>${m.desc}</p><span class="cell-path-chip">${branch}</span><footer><span class="cost">🧬 ${m.cost} DNA</span><button class="small-btn" ${owned||!check.ok?'disabled':''}>${owned?'ADQUIRIDA':check.ok?(m.final?'EVOLUIR':'ADAPTAR'):check.reason}</button></footer>`;
+      el.querySelector('button').onclick=()=>{if(CellSystem.buy(m.id)){UISystem.renderEvolution();UISystem.refresh();}};UI.evoOptions.appendChild(el);
+    }
+    RenderSystem.drawPortraits();return;
+  }
+  UI.evoTitle.textContent='LABORATÓRIO EVOLUTIVO';const g=Game.species.genes;UI.evoOptions.innerHTML='';for(const m of D.MUTATIONS){const owned=Game.species.mutations.includes(m.id);const el=document.createElement('article');el.className='evo-option';const effect=Object.entries(m.effect).filter(([,v])=>typeof v==='number').map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(' • ');el.innerHTML=`<h3>${m.name}</h3><p>${m.desc}</p><p>${effect}</p><footer><span class="cost">🧬 ${m.cost} DNA</span><button class="small-btn" ${owned?'disabled':''}>${owned?'ADQUIRIDA':'ADAPTAR'}</button></footer>`;el.querySelector('button').onclick=()=>{if(EvolutionSystem.buy(m.id)){UISystem.renderEvolution();UISystem.refresh();}};UI.evoOptions.appendChild(el);}}
 UISystem.renderBuild=function(){UI.buildOptions.innerHTML='';for(const b of Object.values(D.BUILDINGS)){const el=document.createElement('article');el.className='build-option';el.innerHTML=`<h3>${b.name}</h3><p>${b.desc}</p><p>🌲 ${b.wood} • 🪨 ${b.stone} • tecnologia ${b.tech}</p><footer><span class="cost">Construção</span><button class="small-btn">ERGUR</button></footer>`;el.querySelector('button').onclick=()=>BuildingSystem.build(b.id);UI.buildOptions.appendChild(el);}}
 function renderBuild(){UISystem.renderBuild();}
-UISystem.dashboard=function(tab=Game.activeTab){Game.activeTab=tab;const s=Game.species;let html='';if(tab==='overview'){html=`<div class="dashboard-grid"><div class="dash-card"><span>Geração</span><strong>${s.generation}</strong></div><div class="dash-card"><span>População</span><strong>${s.population}</strong></div><div class="dash-card"><span>DNA</span><strong>${Math.floor(s.dna)}</strong></div><div class="dash-card"><span>Cultura</span><strong>${Math.floor(s.culture)}</strong></div></div><div class="dashboard-section" style="margin-top:12px"><h3>História recente</h3><div class="event-log">${s.history.slice(-12).reverse().map(x=>`<div>${x}</div>`).join('')}</div></div>`;}else if(tab==='ecology'){const b=BiomeSystem.at(Game.player.x,Game.player.y);html=`<div class="dashboard-grid"><div class="dash-card"><span>Bioma</span><strong>${b.icon}</strong><span>${b.name}</span></div><div class="dash-card"><span>Umidade</span><strong>${b.humidity}%</strong></div><div class="dash-card"><span>Água</span><strong>${b.water}%</strong></div><div class="dash-card"><span>Clima</span><strong>${D.WEATHER[Game.weather].name}</strong></div></div><div class="dashboard-section" style="margin-top:12px"><h3>Relação animal • vegetal</h3><p style="color:var(--muted);font-size:10px;line-height:1.6">Plantas crescem conforme umidade, fertilidade e clima. Herbívoros consomem crescimento vegetal; predadores perseguem presas e a disponibilidade de alimento altera a população. O fogo e a enchente não são apenas dano: reorganizam recursos e território.</p></div>`;}else if(tab==='lineage'){html=`<div class="dashboard-section"><h3>Gerações registradas</h3>${Game.lineage.map((n,i)=>`<div class="lineage-node"><b>G${n.generation||i+1}</b><span>${n.name}</span><small>${n.note||'Descendente'}</small></div>`).join('')}</div>`;}else if(tab==='culture'){html=`<div class="dashboard-grid"><div class="dash-card"><span>Cultura</span><strong>${Math.floor(s.culture)}</strong></div><div class="dash-card"><span>Sociedade</span><strong>${s.settlementLevel<2?'Grupo':s.settlementLevel===2?'Tribo':s.settlementLevel===3?'Aldeia':'Civilização'}</strong></div><div class="dash-card"><span>Conhecimento</span><strong>${Math.floor(s.knowledge)}</strong></div><div class="dash-card"><span>Tecnologia</span><strong>${Math.floor(s.technology)}</strong></div></div><div class="chip-list" style="margin-top:12px">${['Tradições','Símbolos','Arquitetura','Arte','Música','Costumes'].map(x=>`<span class="chip">${x}</span>`).join('')}</div>`;}else if(tab==='technology'){html='<div class="tech-grid">'+Object.values(D.TECHNOLOGIES).map(t=>{const owned=s.unlockedTech.includes(t.id);return `<article class="tech-card"><strong>${t.name}</strong><p>${t.desc}</p><span class="cost">🧬 ${t.cost} DNA</span><button class="small-btn" data-tech="${t.id}" ${owned?'disabled':''}>${owned?'DOMINADA':'ESTUDAR'}</button></article>`;}).join('')+'</div>';}else{html='<div class="codex-grid dashboard-section">'+D.CODEX.slice(0,80).map(r=>`<article class="codex-record"><div class="codex-index">${r.id.slice(-4)}</div><div class="codex-copy"><h3>${r.title}</h3><p>${r.note}</p></div><div class="codex-seal">BIO</div></article>`).join('')+'</div>';}
+UISystem.dashboard=function(tab=Game.activeTab){Game.activeTab=tab;const s=Game.species;let html='';if(Game.stage==='cell'){const cell=Game.cell,path=CellSystem.path();UI.dashboardBody.innerHTML=`<div class="dashboard-grid"><div class="dash-card"><span>Estágio</span><strong>🦠</strong><span>Celular</span></div><div class="dash-card"><span>DNA</span><strong>${Math.floor(s.dna)}</strong></div><div class="dash-card"><span>Adaptações</span><strong>${s.mutations.length}</strong></div><div class="dash-card"><span>Tendência</span><strong>${path}</strong></div></div><div class="dashboard-section" style="margin-top:12px"><h3>Construção da linhagem</h3><p style="color:var(--muted);font-size:10px;line-height:1.7">Sua espécie ainda não é animal nem planta. Fagocitose, toxinas e motilidade empurram a linhagem para estratégias animais; fotossíntese e cloroplastos reforçam a estratégia vegetal. A multicelularidade encerra esta fase.</p></div>`;document.querySelectorAll('.dashboard-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));return;}if(tab==='overview'){html=`<div class="dashboard-grid"><div class="dash-card"><span>Geração</span><strong>${s.generation}</strong></div><div class="dash-card"><span>População</span><strong>${s.population}</strong></div><div class="dash-card"><span>DNA</span><strong>${Math.floor(s.dna)}</strong></div><div class="dash-card"><span>Cultura</span><strong>${Math.floor(s.culture)}</strong></div></div><div class="dashboard-section" style="margin-top:12px"><h3>História recente</h3><div class="event-log">${s.history.slice(-12).reverse().map(x=>`<div>${x}</div>`).join('')}</div></div>`;}else if(tab==='ecology'){const b=BiomeSystem.at(Game.player.x,Game.player.y);html=`<div class="dashboard-grid"><div class="dash-card"><span>Bioma</span><strong>${b.icon}</strong><span>${b.name}</span></div><div class="dash-card"><span>Umidade</span><strong>${b.humidity}%</strong></div><div class="dash-card"><span>Água</span><strong>${b.water}%</strong></div><div class="dash-card"><span>Clima</span><strong>${D.WEATHER[Game.weather].name}</strong></div></div><div class="dashboard-section" style="margin-top:12px"><h3>Relação animal • vegetal</h3><p style="color:var(--muted);font-size:10px;line-height:1.6">Plantas crescem conforme umidade, fertilidade e clima. Herbívoros consomem crescimento vegetal; predadores perseguem presas e a disponibilidade de alimento altera a população. O fogo e a enchente não são apenas dano: reorganizam recursos e território.</p></div>`;}else if(tab==='lineage'){html=`<div class="dashboard-section"><h3>Gerações registradas</h3>${Game.lineage.map((n,i)=>`<div class="lineage-node"><b>G${n.generation||i+1}</b><span>${n.name}</span><small>${n.note||'Descendente'}</small></div>`).join('')}</div>`;}else if(tab==='culture'){html=`<div class="dashboard-grid"><div class="dash-card"><span>Cultura</span><strong>${Math.floor(s.culture)}</strong></div><div class="dash-card"><span>Sociedade</span><strong>${s.settlementLevel<2?'Grupo':s.settlementLevel===2?'Tribo':s.settlementLevel===3?'Aldeia':'Civilização'}</strong></div><div class="dash-card"><span>Conhecimento</span><strong>${Math.floor(s.knowledge)}</strong></div><div class="dash-card"><span>Tecnologia</span><strong>${Math.floor(s.technology)}</strong></div></div><div class="chip-list" style="margin-top:12px">${['Tradições','Símbolos','Arquitetura','Arte','Música','Costumes'].map(x=>`<span class="chip">${x}</span>`).join('')}</div>`;}else if(tab==='technology'){html='<div class="tech-grid">'+Object.values(D.TECHNOLOGIES).map(t=>{const owned=s.unlockedTech.includes(t.id);return `<article class="tech-card"><strong>${t.name}</strong><p>${t.desc}</p><span class="cost">🧬 ${t.cost} DNA</span><button class="small-btn" data-tech="${t.id}" ${owned?'disabled':''}>${owned?'DOMINADA':'ESTUDAR'}</button></article>`;}).join('')+'</div>';}else{html='<div class="codex-grid dashboard-section">'+D.CODEX.slice(0,80).map(r=>`<article class="codex-record"><div class="codex-index">${r.id.slice(-4)}</div><div class="codex-copy"><h3>${r.title}</h3><p>${r.note}</p></div><div class="codex-seal">BIO</div></article>`).join('')+'</div>';}
   UI.dashboardBody.innerHTML=html;document.querySelectorAll('[data-tech]').forEach(b=>b.onclick=()=>{if(TechnologySystem.unlock(b.dataset.tech))UISystem.dashboard('technology');UISystem.refresh();});document.querySelectorAll('.dashboard-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));};
 UISystem.map=function(){const w=mapCanvas.width,h=mapCanvas.height;mapCtx.fillStyle='#07110b';mapCtx.fillRect(0,0,w,h);const cw=w/D.WORLD_W,ch=h/D.WORLD_H;for(let y=0;y<D.WORLD_H;y++){for(let x=0;x<D.WORLD_W;x++){const b=D.BIOMES[D.BIOME_ORDER[tile(x,y)]];mapCtx.fillStyle=b.base;mapCtx.fillRect(x*cw,y*ch,Math.ceil(cw)+1,Math.ceil(ch)+1);}}if(Game.player){mapCtx.fillStyle='#fff';mapCtx.beginPath();mapCtx.arc(Game.player.x*cw,Game.player.y*ch,4,0,Math.PI*2);mapCtx.fill();}UI.mapLegend.innerHTML=D.BIOME_ORDER.map(id=>`<span class="legend-pill">${D.BIOMES[id].icon} ${D.BIOMES[id].name}</span>`).join('');setModal(UI.map,true);};
 UISystem.lineage=function(){lineageCtx.fillStyle='#07110b';lineageCtx.fillRect(0,0,lineageCanvas.width,lineageCanvas.height);const nodes=Game.lineage.slice(-22);nodes.forEach((n,i)=>{const x=40+(i%7)*125,y=55+Math.floor(i/7)*130;lineageCtx.fillStyle='#14271a';lineageCtx.fillRect(x,y,104,58);lineageCtx.strokeStyle='#3a6540';lineageCtx.strokeRect(x,y,104,58);lineageCtx.fillStyle='#e8f1e3';lineageCtx.font='900 11px monospace';lineageCtx.fillText('G'+n.generation,x+10,y+18);lineageCtx.fillStyle='#8fa58f';lineageCtx.font='9px monospace';lineageCtx.fillText(String(n.name).slice(0,15),x+10,y+35);if(i>0){lineageCtx.strokeStyle='#547657';lineageCtx.beginPath();lineageCtx.moveTo(x-22,y+28);lineageCtx.lineTo(x,y+28);lineageCtx.stroke();}});UI.lineageTree.innerHTML=nodes.slice().reverse().map(n=>`<div class="lineage-node"><b>G${n.generation}</b><span>${n.name}</span><small>${n.note||'Descendente registrado'}</small></div>`).join('');setModal(UI.lineage,true);};
-SaveSystem.serialize=function(){const safe={version:D.VERSION,seed:Game.seed,selectedBiome:Game.selectedBiome,species:Game.species,player:{x:Game.player.x,y:Game.player.y,hp:Game.player.hp,energy:Game.player.energy,water:Game.player.water,alive:Game.player.alive},weather:Game.weather,weatherTimer:Game.weatherTimer,day:Game.day,hour:Game.hour,discoveries:[...Game.discoveries],buildings:Game.buildings.slice(0,160),lineage:Game.lineage.slice(-120)};return JSON.stringify(safe);};
+SaveSystem.serialize=function(){const safe={version:D.VERSION,stage:Game.stage,seed:Game.seed,selectedBiome:Game.selectedBiome,species:Game.species,cell:Game.stage==='cell'?Game.cell:null,player:{x:Game.player.x,y:Game.player.y,hp:Game.player.hp,energy:Game.player.energy,water:Game.player.water,alive:Game.player.alive},weather:Game.weather,weatherTimer:Game.weatherTimer,day:Game.day,hour:Game.hour,discoveries:[...Game.discoveries],buildings:Game.buildings.slice(0,160),lineage:Game.lineage.slice(-120)};return JSON.stringify(safe);};
 SaveSystem.save=function(){try{localStorage.setItem('bioevo_save_final',this.serialize());say('Jogo salvo localmente.');}catch(e){say('Não foi possível salvar: '+e.message);}};
-SaveSystem.load=function(){try{const raw=localStorage.getItem('bioevo_save_final');if(!raw)return false;const s=JSON.parse(raw);if(!s||!s.species||!s.player)return false;Game.seed=s.seed||Game.seed;Game.selectedBiome=s.selectedBiome||'cerrado';Game.species=s.species;Game.player=Object.assign(Game.player||{},s.player,{alive:s.player.alive!==false});Game.weather=s.weather||'clear';Game.weatherTimer=s.weatherTimer||50;Game.day=s.day||1;Game.hour=s.hour||6;Game.discoveries=new Set(s.discoveries||[Game.selectedBiome]);Game.buildings=s.buildings||[];Game.lineage=s.lineage||[];return true;}catch(e){console.warn(e);return false;}};
+SaveSystem.load=function(){try{const raw=localStorage.getItem('bioevo_save_final');if(!raw)return false;const s=JSON.parse(raw);if(!s||!s.species||!s.player)return false;Game.stage=s.stage||'organism';Game.seed=s.seed||Game.seed;Game.selectedBiome=s.selectedBiome||'cerrado';Game.species=s.species;Game.player=Object.assign(Game.player||{},s.player,{alive:s.player.alive!==false});Game.cell=s.cell||null;Game.weather=s.weather||'clear';Game.weatherTimer=s.weatherTimer||50;Game.day=s.day||1;Game.hour=s.hour||6;Game.discoveries=new Set(s.discoveries||[]);Game.buildings=s.buildings||[];Game.lineage=s.lineage||[];if(Game.stage==='cell'&&Game.cell){document.body.classList.add('cell-stage');}return true;}catch(e){console.warn(e);return false;}};
 UISystem.bind=function(){
   window.addEventListener('resize',RenderSystem.resize);RenderSystem.resize();
-  window.addEventListener('keydown',e=>{Game.keys[e.key]=true;const k=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(k==='q'){UISystem.renderEvolution();setModal(UI.evo,true);}if(k==='b'){UISystem.renderBuild();setModal(UI.build,true);}if(k==='l')UISystem.lineage();if(k==='m')UISystem.map();if(k==='e')PlayerSystem.eat();if(k==='r')ReproductionSystem.tryBreed();if(k==='f')PlayerSystem.attack();if(k==='escape'){[UI.evo,UI.build,UI.lineage,UI.map].forEach(x=>setModal(x,false));UI.dashboard.classList.add('hidden');}if(k===' '){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}});window.addEventListener('keyup',e=>{Game.keys[e.key]=false;});
+  window.addEventListener('keydown',e=>{Game.keys[e.key]=true;const k=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(k==='q'){UISystem.renderEvolution();setModal(UI.evo,true);}if(k==='e'){if(Game.stage==='cell')CellSystem.absorb();else PlayerSystem.eat();}if(Game.stage!=='cell'&&k==='b'){UISystem.renderBuild();setModal(UI.build,true);}if(Game.stage!=='cell'&&k==='l')UISystem.lineage();if(Game.stage!=='cell'&&k==='m')UISystem.map();if(Game.stage!=='cell'&&k==='r')ReproductionSystem.tryBreed();if(Game.stage!=='cell'&&k==='f')PlayerSystem.attack();if(k==='escape'){[UI.evo,UI.build,UI.lineage,UI.map].forEach(x=>setModal(x,false));UI.dashboard.classList.add('hidden');}if(k===' '){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}});window.addEventListener('keyup',e=>{Game.keys[e.key]=false;});
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>setModal($(b.dataset.close),false));document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>Actions.run(b.dataset.action));document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{Game.activeTab=b.dataset.tab;UISystem.dashboard(Game.activeTab);});$('btn-start').onclick=Actions.start;
 };
-const Actions={run(action){if(action==='pause'){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}if(action==='evolution'){UISystem.renderEvolution();setModal(UI.evo,true);}if(action==='dashboard'){Game.activeTab='overview';UI.dashboard.classList.remove('hidden');UISystem.dashboard('overview');}if(action==='dashboard-close'){UI.dashboard.classList.add('hidden');}if(action==='save'){SaveSystem.save();}},start(){const name=$('input-species').value.trim()||'Carijó';EvolutionSystem.newSpecies(name,Game.selectedBiome);WorldSystem.init();WeatherSystem.start();Game.running=true;UI.start.classList.add('hidden');UI.loading.classList.add('hidden');UISystem.refresh();say('A linhagem '+name+' nasceu em '+D.BIOMES[Game.selectedBiome].name+'.');}};
+const Actions={run(action){if(action==='pause'){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}if(action==='evolution'){UISystem.renderEvolution();setModal(UI.evo,true);}if(action==='dashboard'){Game.activeTab='overview';UI.dashboard.classList.remove('hidden');UISystem.dashboard('overview');}if(action==='dashboard-close'){UI.dashboard.classList.add('hidden');}if(action==='save'){SaveSystem.save();}},start(){const name=$('input-species').value.trim()||'Carijó';EvolutionSystem.newSpecies(name,Game.selectedBiome);CellSystem.init();Game.running=true;UI.start.classList.add('hidden');UI.loading.classList.add('hidden');UISystem.refresh();say('A vida começou: '+name+' é agora uma célula simples. Colete DNA e escolha como evoluir.');}};
 UISystem.startScreen();UISystem.bind();
-function step(dt){if(!Game.running||Game.paused||!Game.player)return;TimeSystem.update(dt);WeatherSystem.update(dt);PlayerSystem.update(dt);PlantSystem.update(dt);AnimalAISystem.update(dt);PopulationSystem.update(dt*.2);DiplomacySystem.update(dt);Game.autosaveTimer+=dt;if(Game.autosaveTimer>30){Game.autosaveTimer=0;SaveSystem.save();}UISystem.refresh();}
-function loop(now){const dt=Math.min(.05,(now-Game.last)/1000);Game.last=now;step(dt);RenderSystem.drawWorld();requestAnimationFrame(loop);}
+function step(dt){if(!Game.running||Game.paused||!Game.player)return;if(Game.stage==='cell'){Game.time+=dt;CellSystem.update(dt);}else{TimeSystem.update(dt);WeatherSystem.update(dt);PlayerSystem.update(dt);PlantSystem.update(dt);AnimalAISystem.update(dt);PopulationSystem.update(dt*.2);DiplomacySystem.update(dt);}Game.autosaveTimer+=dt;if(Game.autosaveTimer>30){Game.autosaveTimer=0;SaveSystem.save();}UISystem.refresh();}
+function loop(now){const dt=Math.min(.05,(now-Game.last)/1000);Game.last=now;step(dt);if(Game.stage==='cell'&&Game.cell)CellSystem.draw();else RenderSystem.drawWorld();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 })();
 // Diagnostic rule 0001: water

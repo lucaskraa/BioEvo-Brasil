@@ -2739,9 +2739,17 @@
     <div class='codex-seal'>BIO</div>
   </article>
 </template>
-<script src='data.js'></script>
-<script src='sprites.js'></script>
-<script src='game.js'></script>
+<script>
+window.addEventListener('error', function(event){
+  const loading=document.getElementById('loading');
+  if(!loading) return;
+  loading.classList.remove('hidden');
+  loading.innerHTML='<strong>Erro ao iniciar o BioEvo.</strong><span>'+String(event.message||'Erro desconhecido')+'</span>';
+});
+</script>
+<script src='data.js?v=cellular-1.1'></script>
+<script src='sprites.js?v=cellular-1.1'></script>
+<script src='game.js?v=cellular-1.1'></script>
 <script>document.getElementById('loading')?.classList.add('hidden');</script>
 </body>
 </html>

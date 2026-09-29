@@ -20,6 +20,164 @@ function key(x,y){return y*D.WORLD_W+x;}
 function say(text){const node=document.createElement('div');node.textContent=text;UI.log.prepend(node);while(UI.log.children.length>22)UI.log.lastChild.remove();UI.toast.textContent=text;UI.toast.classList.remove('hidden');clearTimeout(say.timer);say.timer=setTimeout(()=>UI.toast.classList.add('hidden'),2200);}
 function setModal(el,on=true){el.classList.toggle('hidden',!on);}
 function normGenes(g){return Object.assign(D.cloneGenes(D.START_GENES),g||{});}
+
+/* ===== APPEARANCE SYSTEM V4 ===== */
+const AppearanceSystem={};
+AppearanceSystem.palette=['#71c6c0','#6e9bd3','#78b966','#d99a68','#d36f82','#a984cf','#d7b867','#d8d6ca','#5f7654','#383d48'];
+AppearanceSystem.defaults=function(){return{
+  cell:{shape:'organic',primary:'#71c6c0',secondary:'#b8ece1',pattern:'soft',length:1,width:1},
+  animal:{body:'fish',primary:'#6594a6',secondary:'#a5d6da',pattern:'spots',head:'round',tail:'fin',length:1,width:1,eye:1},
+  plant:{habit:'herb',stem:'#5c7a48',leaf:'#78b966',accent:'#d7b867',leafShape:'oval',root:'fibrous',flower:'bud',fruit:'none',height:1,width:1,leafCount:5}
+};};
+AppearanceSystem.ensure=function(){
+  if(!Game.species)return this.defaults();
+  const d=this.defaults(),a=Game.species.appearance||{};
+  Game.species.appearance={
+    cell:Object.assign({},d.cell,a.cell||{}),
+    animal:Object.assign({},d.animal,a.animal||{}),
+    plant:Object.assign({},d.plant,a.plant||{})
+  };
+  return Game.species.appearance;
+};
+AppearanceSystem.canAnimalBody=function(body){
+  const owned=Game.species?.mutations||[];
+  if(body==='fish')return true;
+  if(body==='quadruped')return owned.includes('swift_legs')||owned.includes('tool_use');
+  if(body==='bird')return owned.includes('air_sacs');
+  return false;
+};
+AppearanceSystem.canPlantHabit=function(habit){
+  const owned=Game.species?.mutations||[];
+  if(habit==='herb')return true;
+  if(habit==='shrub')return owned.includes('broad_leaves');
+  if(habit==='tree')return owned.includes('thick_stem');
+  if(habit==='cactus')return owned.includes('deep_roots')&&owned.includes('water_storage');
+  return false;
+};
+AppearanceSystem.syncGenes=function(){
+  if(!Game.species)return;
+  const a=this.ensure(),g=Game.species.genes||{};
+  if(Game.stage==='cell'){g.color=a.cell.primary;return;}
+  if(g.body==='plant'||Game.species.lifePath==='vegetal'){
+    g.body='plant';g.color=a.plant.leaf;g.appearance=Object.assign({},a.plant);return;
+  }
+  if(!this.canAnimalBody(a.animal.body))a.animal.body='fish';
+  g.body=a.animal.body;g.color=a.animal.primary;g.appearance=Object.assign({},a.animal);
+};
+AppearanceSystem.applyMutation=function(id){
+  const a=this.ensure();
+  if(id==='armor')a.animal.pattern='bands';
+  if(id==='cold_fur')a.animal.pattern='soft';
+  if(id==='air_sacs'&&this.canAnimalBody('bird'))a.animal.body='bird';
+  if(id==='swift_legs'&&a.animal.body==='fish')a.animal.body='quadruped';
+  if(id==='thick_stem'&&a.plant.habit==='herb')a.plant.habit='tree';
+  if(id==='broad_leaves'&&a.plant.habit==='herb')a.plant.habit='shrub';
+  if(id==='deep_roots')a.plant.root='deep';
+  if(id==='showy_flower')a.plant.flower='star';
+  if(id==='sweet_fruit')a.plant.fruit='berry';
+};
+AppearanceSystem.drawCellPattern=function(target,r,a){
+  const c=a.secondary||'#b8ece1';target.save();target.globalAlpha=.42;target.fillStyle=c;target.strokeStyle=c;
+  if(a.pattern==='spots'){for(const p of [[-.32,-.18],[.12,-.28],[.32,.08],[-.08,.26],[-.38,.18]]){target.beginPath();target.arc(p[0]*r,p[1]*r,Math.max(1.5,r*.08),0,Math.PI*2);target.fill();}}
+  else if(a.pattern==='stripes'){target.lineWidth=Math.max(1.2,r*.06);for(const xx of [-.35,-.12,.12,.35]){target.beginPath();target.moveTo(xx*r,-r*.62);target.lineTo(xx*r,r*.62);target.stroke();}}
+  else if(a.pattern==='glow'){target.globalAlpha=.24;target.shadowColor=c;target.shadowBlur=r*.45;target.beginPath();target.arc(0,0,r*.68,0,Math.PI*2);target.strokeStyle=c;target.lineWidth=Math.max(2,r*.08);target.stroke();}
+  else {target.globalAlpha=.18;target.beginPath();target.ellipse(-r*.16,-r*.18,r*.34,r*.18,-.35,0,Math.PI*2);target.fill();}
+  if(a.shape==='segmented'){target.globalAlpha=.22;target.fillStyle='#0d2b2d';for(const xx of [-.32,0,.32])target.fillRect(xx*r-r*.025,-r*.7,r*.05,r*1.4);}
+  target.restore();
+};
+AppearanceSystem.drawLeaf=function(target,x,y,s,shape,color,rot=0){
+  target.save();target.translate(x,y);target.rotate(rot);target.fillStyle=color;target.beginPath();
+  if(shape==='lance'){target.moveTo(0,-s);target.quadraticCurveTo(s*.55,0,0,s);target.quadraticCurveTo(-s*.55,0,0,-s);}
+  else if(shape==='heart'){target.moveTo(0,s*.9);target.bezierCurveTo(-s*1.15,s*.15,-s*.8,-s*.8,0,-s*.25);target.bezierCurveTo(s*.8,-s*.8,s*1.15,s*.15,0,s*.9);}
+  else if(shape==='frond'){target.moveTo(0,s);for(let i=4;i>=-4;i--){const yy=i*s*.2;target.lineTo((i%2?1:-1)*s*.65,yy);}target.closePath();}
+  else target.ellipse(0,0,s*.68,s,0,0,Math.PI*2);
+  target.closePath();target.fill();target.restore();
+};
+AppearanceSystem.drawPlant=function(target,x,y,size,opt={}){
+  const a=this.ensure().plant,owned=Game.species?.mutations||[];target.save();target.translate(x,y);target.scale(a.width||1,a.height||1);target.imageSmoothingEnabled=false;
+  target.fillStyle='rgba(0,0,0,.22)';target.beginPath();target.ellipse(0,size*.34,size*.34,size*.09,0,0,Math.PI*2);target.fill();
+  target.strokeStyle='rgba(124,92,61,.58)';target.lineWidth=Math.max(1,size*.028);
+  if(a.root==='deep'){target.beginPath();target.moveTo(0,size*.2);target.lineTo(0,size*.48);target.stroke();}
+  else {for(const ang of [-2.7,-2.15,-1.0,-.45]){target.beginPath();target.moveTo(0,size*.2);target.lineTo(Math.cos(ang)*size*.28,size*.24+Math.abs(Math.sin(ang))*size*.18);target.stroke();}}
+  if(a.habit==='cactus'){
+    target.fillStyle=a.stem;target.fillRect(-size*.09,-size*.34,size*.18,size*.68);
+    for(const side of [-1,1]){target.fillRect(side*size*.09,-size*.18,size*.18,size*.09);target.fillRect(side*size*.20,-size*.18,size*.07,size*.28);}
+  }else{
+    const trunk=a.habit==='tree'?size*.12:a.habit==='shrub'?size*.075:size*.045;
+    target.strokeStyle=a.stem;target.lineWidth=Math.max(3,trunk);target.lineCap='round';target.beginPath();target.moveTo(0,size*.22);target.lineTo(0,-size*(a.habit==='tree'?.34:.24));target.stroke();
+    const count=Math.round(a.leafCount||5),spread=a.habit==='tree'?size*.34:a.habit==='shrub'?size*.28:size*.22;
+    for(let i=0;i<count;i++){const ang=(i/(Math.max(1,count-1))-.5)*Math.PI*1.55;const lx=Math.sin(ang)*spread,ly=-size*.18-Math.cos(ang)*size*(a.habit==='tree'?.20:.13);this.drawLeaf(target,lx,ly,size*(a.habit==='tree'?.13:.11),a.leafShape,a.leaf,ang*.5);}
+  }
+  if(a.flower!=='none'&&(owned.includes('showy_flower')||a.flower==='bud')){target.fillStyle=a.accent;const petals=a.flower==='star'?6:4;for(let i=0;i<petals;i++){const ang=i/petals*Math.PI*2;target.beginPath();target.ellipse(Math.cos(ang)*size*.055,-size*.39+Math.sin(ang)*size*.055,size*.032,size*.065,ang,0,Math.PI*2);target.fill();}target.beginPath();target.arc(0,-size*.39,size*.032,0,Math.PI*2);target.fill();}
+  if(a.fruit!=='none'&&owned.includes('sweet_fruit')){target.fillStyle='#d56f66';for(const p of [[-.13,-.15],[.16,-.22],[.05,-.08]]){target.beginPath();target.arc(p[0]*size,p[1]*size,size*.04,0,Math.PI*2);target.fill();}}
+  if(owned.includes('thorns')||owned.includes('toxin')){target.strokeStyle='#d9d3b0';target.lineWidth=1;for(let i=0;i<5;i++){const yy=-size*.22+i*size*.09;target.beginPath();target.moveTo(size*.04,yy);target.lineTo(size*.15,yy-size*.045);target.stroke();}}
+  target.restore();
+};
+AppearanceSystem.drawAnimal=function(target,x,y,size,opt={}){
+  const a=this.ensure().animal,g=Game.species.genes;this.syncGenes();target.save();target.translate(x,y);target.scale(a.length||1,a.width||1);SP.drawPlayer(target,0,0,size,g,opt);
+  target.save();target.scale(opt.facing||1,1);target.globalAlpha=.48;target.fillStyle=a.secondary;target.strokeStyle=a.secondary;
+  if(a.pattern==='spots'){for(const p of [[-.2,-.08],[.02,.05],[.18,-.13]]){target.beginPath();target.arc(p[0]*size,p[1]*size,size*.045,0,Math.PI*2);target.fill();}}
+  else if(a.pattern==='stripes'||a.pattern==='bands'){target.lineWidth=Math.max(1.5,size*.025);for(const xx of [-.20,-.05,.10,.24]){target.beginPath();target.moveTo(xx*size,-size*.18);target.lineTo((xx+.04)*size,size*.16);target.stroke();}}
+  if((Game.species.mutations||[]).includes('armor')){target.globalAlpha=.45;target.strokeStyle='#d8d0ab';target.lineWidth=Math.max(1,size*.025);for(let i=0;i<4;i++){target.beginPath();target.arc(-size*.06,size*.01,size*(.18+i*.035),Math.PI*1.05,Math.PI*1.95);target.stroke();}}
+  target.restore();target.restore();
+};
+AppearanceSystem.drawCurrent=function(target,x,y,size,opt={}){
+  if(Game.species?.genes?.body==='plant'||Game.species?.lifePath==='vegetal')this.drawPlant(target,x,y,size,opt);else this.drawAnimal(target,x,y,size,opt);
+};
+AppearanceSystem.choiceButtons=function(section,key,choices){
+  const a=this.ensure()[section];return '<div class="appearance-choices">'+choices.map(c=>{const locked=!!c.locked;return '<button class="appearance-choice '+(a[key]===c.value?'active ':'')+(locked?'locked':'')+'" data-look-key="'+key+'" data-look-value="'+c.value+'" '+(locked?'disabled':'')+'><b>'+c.icon+'</b><span>'+c.label+'</span>'+(locked?'<small>'+c.locked+'</small>':'')+'</button>';}).join('')+'</div>';
+};
+AppearanceSystem.paletteButtons=function(section,key){
+  const value=this.ensure()[section][key];return '<div class="palette-row">'+this.palette.map(c=>'<button class="palette-dot '+(value===c?'active':'')+'" data-look-key="'+key+'" data-look-value="'+c+'" style="--swatch:'+c+'" aria-label="'+c+'"></button>').join('')+'</div>';
+};
+AppearanceSystem.renderEditor=function(section,root){
+  const a=this.ensure()[section],owned=Game.species?.mutations||[];
+  let html='<div class="appearance-editor"><div class="appearance-hero"><div><span class="evo-kicker">EDITOR DE FORMA</span><strong>Seu corpo faz parte da evolução</strong><p>As escolhas visuais ficam salvas na linhagem e aparecem no mundo. Novas estruturas são liberadas pelas mutações.</p></div><span class="appearance-live">● AO VIVO</span></div>';
+  if(section==='cell'){
+    html+='<section class="appearance-section"><h3>Forma celular</h3>'+this.choiceButtons('cell','shape',[
+      {value:'organic',label:'Orgânica',icon:'◌'},{value:'oval',label:'Oval',icon:'⬭'},{value:'spore',label:'Esporo',icon:'✹'},{value:'segmented',label:'Segmentada',icon:'▰'}
+    ])+'</section>';
+    html+='<section class="appearance-section"><h3>Padrão</h3>'+this.choiceButtons('cell','pattern',[
+      {value:'soft',label:'Suave',icon:'◍'},{value:'spots',label:'Pintas',icon:'⠿'},{value:'stripes',label:'Listras',icon:'≋'},{value:'glow',label:'Bioluz',icon:'✦'}
+    ])+'</section>';
+    html+='<section class="appearance-section"><h3>Cor principal</h3>'+this.paletteButtons('cell','primary')+'<h3>Cor secundária</h3>'+this.paletteButtons('cell','secondary')+'</section>';
+    html+='<section class="appearance-section slider-grid"><label>Comprimento <input type="range" min=".78" max="1.35" step=".01" value="'+a.length+'" data-look-range="length"><output>'+Number(a.length).toFixed(2)+'×</output></label><label>Largura <input type="range" min=".78" max="1.30" step=".01" value="'+a.width+'" data-look-range="width"><output>'+Number(a.width).toFixed(2)+'×</output></label></section>';
+  }else if(section==='animal'){
+    html+='<section class="appearance-section"><h3>Plano corporal</h3>'+this.choiceButtons('animal','body',[
+      {value:'fish',label:'Aquático',icon:'🐟'},
+      {value:'quadruped',label:'Terrestre',icon:'🐾',locked:this.canAnimalBody('quadruped')?'':'Evolua pernas'},
+      {value:'bird',label:'Voador',icon:'🪽',locked:this.canAnimalBody('bird')?'':'Evolua sacos aéreos'}
+    ])+'</section>';
+    html+='<section class="appearance-section"><h3>Padrão da pele</h3>'+this.choiceButtons('animal','pattern',[
+      {value:'soft',label:'Lisa',icon:'◍'},{value:'spots',label:'Pintas',icon:'⠿'},{value:'stripes',label:'Listras',icon:'≋'},{value:'bands',label:'Faixas',icon:'▤'}
+    ])+'</section>';
+    html+='<section class="appearance-section"><h3>Cor principal</h3>'+this.paletteButtons('animal','primary')+'<h3>Marcas</h3>'+this.paletteButtons('animal','secondary')+'</section>';
+    html+='<section class="appearance-section slider-grid"><label>Corpo comprido <input type="range" min=".78" max="1.35" step=".01" value="'+a.length+'" data-look-range="length"><output>'+Number(a.length).toFixed(2)+'×</output></label><label>Altura do corpo <input type="range" min=".78" max="1.30" step=".01" value="'+a.width+'" data-look-range="width"><output>'+Number(a.width).toFixed(2)+'×</output></label></section>';
+  }else{
+    html+='<section class="appearance-section"><h3>Porte da planta</h3>'+this.choiceButtons('plant','habit',[
+      {value:'herb',label:'Herbácea',icon:'🌱'},
+      {value:'shrub',label:'Arbusto',icon:'🌿',locked:this.canPlantHabit('shrub')?'':'Folhas largas'},
+      {value:'tree',label:'Árvore',icon:'🌳',locked:this.canPlantHabit('tree')?'':'Caule grosso'},
+      {value:'cactus',label:'Suculenta',icon:'🌵',locked:this.canPlantHabit('cactus')?'':'Raízes + reserva hídrica'}
+    ])+'</section>';
+    html+='<section class="appearance-section"><h3>Folhas</h3>'+this.choiceButtons('plant','leafShape',[
+      {value:'oval',label:'Ovais',icon:'🍃'},{value:'lance',label:'Lanceoladas',icon:'↟'},{value:'heart',label:'Cordiformes',icon:'♥'},{value:'frond',label:'Frondes',icon:'〰'}
+    ])+'</section>';
+    html+='<section class="appearance-section"><h3>Raízes e reprodução</h3>'+this.choiceButtons('plant','root',[
+      {value:'fibrous',label:'Fibrosas',icon:'⌁'},{value:'deep',label:'Profundas',icon:'↓',locked:owned.includes('deep_roots')?'':'Raízes profundas'}
+    ])+this.choiceButtons('plant','flower',[
+      {value:'none',label:'Sem flor',icon:'·'},{value:'bud',label:'Botão',icon:'●'},{value:'star',label:'Flor aberta',icon:'✿',locked:owned.includes('showy_flower')?'':'Flor chamativa'}
+    ])+this.choiceButtons('plant','fruit',[
+      {value:'none',label:'Sem fruto',icon:'·'},{value:'berry',label:'Frutos',icon:'●',locked:owned.includes('sweet_fruit')?'':'Fruto doce'}
+    ])+'</section>';
+    html+='<section class="appearance-section"><h3>Folhagem</h3>'+this.paletteButtons('plant','leaf')+'<h3>Caule</h3>'+this.paletteButtons('plant','stem')+'<h3>Flor/fruto</h3>'+this.paletteButtons('plant','accent')+'</section>';
+    html+='<section class="appearance-section slider-grid"><label>Altura <input type="range" min=".78" max="1.45" step=".01" value="'+a.height+'" data-look-range="height"><output>'+Number(a.height).toFixed(2)+'×</output></label><label>Abertura <input type="range" min=".78" max="1.40" step=".01" value="'+a.width+'" data-look-range="width"><output>'+Number(a.width).toFixed(2)+'×</output></label><label>Quantidade de folhas <input type="range" min="3" max="10" step="1" value="'+a.leafCount+'" data-look-range="leafCount"><output>'+a.leafCount+'</output></label></section>';
+  }
+  html+='</div>';root.innerHTML=html;
+  root.querySelectorAll('[data-look-key]').forEach(btn=>btn.onclick=()=>{if(btn.disabled)return;const key=btn.dataset.lookKey,val=btn.dataset.lookValue;this.ensure()[section][key]=val;this.syncGenes();RenderSystem.drawPortraits();this.renderEditor(section,root);});
+  root.querySelectorAll('[data-look-range]').forEach(input=>input.oninput=()=>{const key=input.dataset.lookRange,val=Number(input.value);this.ensure()[section][key]=val;input.parentElement.querySelector('output').textContent=key==='leafCount'?String(Math.round(val)):val.toFixed(2)+'×';this.syncGenes();RenderSystem.drawPortraits();});
+};
+
 // ===== WORLDSYSTEM =====
 const WorldSystem={};
 WorldSystem.description="Generates a deterministic tile world using layered noise-like smoothing, biome bands, rivers, resources, and landmarks.";
@@ -118,6 +276,7 @@ CellSystem.biomeTheme=function(){
 };
 CellSystem.init=function(){
   Game.stage='cell';
+  AppearanceSystem.ensure();
   document.body.classList.add('cell-stage');
   Game.world={};
   Game.plants=[];Game.animals=[];Game.buildings=[];
@@ -191,6 +350,7 @@ CellSystem.buy=function(id){
   const check=CellSystem.canBuy(m);if(!check.ok){say(check.reason);return false;}
   Game.species.dna-=m.cost;Game.species.mutations.push(m.id);
   for(const[k,v]of Object.entries(m.effect||{}))Game.cell[k]=(Game.cell[k]||0)+v;
+  AppearanceSystem.applyMutation(m.id);AppearanceSystem.syncGenes();
   if(m.id==='vacuole'){Game.cell.energyMax+=24;Game.cell.waterMax+=18;}
   if(m.id==='membrane'){Game.cell.hpMax+=24;Game.cell.hp=Math.min(Game.cell.hpMax,Game.cell.hp+24);}
   Game.species.history.push('Célula: '+m.name);say('Mutação: '+m.name);
@@ -360,11 +520,11 @@ CellSystem.visible=function(x,y,r=0){
   const s=CellSystem.toScreen(x,y);return s.x>-r-80&&s.y>-r-80&&s.x<canvas.width+r+80&&s.y<canvas.height+r+80;
 };
 CellSystem.drawBlob=function(target,x,y,r,color,pulse=0,nucleus=false,flagella=false,toxin=false){
-  const cell=Game.cell||{},owned=Game.species?.mutations||[];target.save();target.translate(x,y);
-  const path=CellSystem.path(),breathe=1+Math.sin(Game.time*3.4+pulse)*.045,sx=(path==='animal'?1.10:path==='vegetal'?.96:1)*(1+Math.sin(Game.time*2.2+pulse)*.025),sy=(path==='animal'?.90:path==='vegetal'?1.06:1)*(1-Math.sin(Game.time*2.2+pulse)*.018);target.scale(sx,sy);
+  const cell=Game.cell||{},owned=Game.species?.mutations||[],app=AppearanceSystem.ensure().cell;color=app.primary||color;target.save();target.translate(x,y);
+  const path=CellSystem.path(),breathe=1+Math.sin(Game.time*3.4+pulse)*.045,sx=(path==='animal'?1.10:path==='vegetal'?.96:1)*(1+Math.sin(Game.time*2.2+pulse)*.025)*(app.length||1),sy=(path==='animal'?.90:path==='vegetal'?1.06:1)*(1-Math.sin(Game.time*2.2+pulse)*.018)*(app.width||1);target.scale(sx,sy);
   target.shadowColor=color;target.shadowBlur=Math.min(28,r*.72);target.fillStyle=color;target.beginPath();
-  for(let i=0;i<=24;i++){const a=i/24*Math.PI*2,freq=path==='vegetal'?5:path==='animal'?2:3,wave=Math.sin(a*freq+pulse+Game.time*2.7)*.06+Math.sin(a*(freq+2)-Game.time*1.8)*.024,rr=r*breathe*(1+wave),px=Math.cos(a)*rr,py=Math.sin(a)*rr;if(i===0)target.moveTo(px,py);else target.lineTo(px,py);}target.closePath();target.fill();target.shadowBlur=0;
-  target.strokeStyle='rgba(232,255,249,.55)';target.lineWidth=Math.max(1.5,r*.075+(cell.membrane||0)*.015);target.stroke();
+  for(let i=0;i<=24;i++){const a=i/24*Math.PI*2,shape=app.shape||'organic',freq=shape==='spore'?7:shape==='segmented'?3:path==='vegetal'?5:path==='animal'?2:3,amp=shape==='oval'?.018:shape==='spore'?.105:shape==='segmented'?.035:.06,wave=Math.sin(a*freq+pulse+Game.time*2.7)*amp+Math.sin(a*(freq+2)-Game.time*1.8)*.024,rr=r*breathe*(1+wave),px=Math.cos(a)*rr,py=Math.sin(a)*rr;if(i===0)target.moveTo(px,py);else target.lineTo(px,py);}target.closePath();target.fill();target.shadowBlur=0;
+  target.strokeStyle='rgba(232,255,249,.55)';target.lineWidth=Math.max(1.5,r*.075+(cell.membrane||0)*.015);target.stroke();AppearanceSystem.drawCellPattern(target,r,app);
   target.fillStyle='rgba(15,42,48,.42)';target.beginPath();target.ellipse(-r*.12,-r*.04,r*.39,r*.32,Math.sin(Game.time*.5)*.08,0,Math.PI*2);target.fill();
   if(nucleus){target.fillStyle='rgba(129,103,198,.88)';target.beginPath();target.arc(-r*.1,-r*.05,r*.17+Math.sin(Game.time*2.4)*.5,0,Math.PI*2);target.fill();}
   if(owned.includes('vacuole')){target.fillStyle='rgba(183,235,239,.24)';for(let i=0;i<3;i++){const a=i/3*Math.PI*2+Game.time*.18;target.beginPath();target.arc(Math.cos(a)*r*.38,Math.sin(a)*r*.30,r*.10,0,Math.PI*2);target.fill();}}
@@ -435,7 +595,7 @@ CellSystem.draw=function(){
     const s=CellSystem.toScreen(m.x,m.y);CellSystem.drawMicrobe(ctx,m,s.x,s.y);
   }
 
-  const me=CellSystem.toScreen(cell.x,cell.y),path=CellSystem.path(),base=path==='vegetal'?'#70c06f':path==='animal'?'#df9569':'#71c6c0';
+  const me=CellSystem.toScreen(cell.x,cell.y),path=CellSystem.path(),base=AppearanceSystem.ensure().cell.primary||(path==='vegetal'?'#70c06f':path==='animal'?'#df9569':'#71c6c0');
   CellSystem.drawBlob(ctx,me.x,me.y,cell.radius,base,cell.pulse,Game.species.mutations.includes('nucleus'),Game.species.mutations.includes('flagellum'),Game.species.mutations.includes('toxin'));
   if(Game.species.mutations.includes('cilia')){
     ctx.strokeStyle='rgba(188,243,228,.58)';ctx.lineWidth=1.4;for(let i=0;i<16;i++){const a=i/16*Math.PI*2;ctx.beginPath();ctx.moveTo(me.x+Math.cos(a)*(cell.radius+2),me.y+Math.sin(a)*(cell.radius+2));ctx.lineTo(me.x+Math.cos(a)*(cell.radius+8),me.y+Math.sin(a)*(cell.radius+8));ctx.stroke();}
@@ -453,29 +613,31 @@ CellSystem.draw=function(){
   CellSystem.drawRadar();
 };
 CellSystem.drawPortrait=function(target,x,y,size){
-  const cell=Game.cell||{membrane:0};const path=CellSystem.path();const base=path==='vegetal'?'#70c06f':path==='animal'?'#df9569':'#71c6c0';
+  const cell=Game.cell||{membrane:0};const path=CellSystem.path();const base=AppearanceSystem.ensure().cell.primary||(path==='vegetal'?'#70c06f':path==='animal'?'#df9569':'#71c6c0');
   CellSystem.drawBlob(target,x,y,size*.34,base,cell.pulse||0,Game.species?.mutations?.includes('nucleus'),Game.species?.mutations?.includes('flagellum'),Game.species?.mutations?.includes('toxin'));
 };
 CellSystem.transition=function(){
-  const cell=Game.cell,path=CellSystem.path();
+  const cell=Game.cell,path=CellSystem.path(),appearance=AppearanceSystem.ensure();
   Game.stage='organism';document.body.classList.remove('cell-stage');
   const plant=path==='vegetal';
   const genes=normGenes({
-    body:plant?'plant':'fish',color:plant?'#70a95e':'#6594a6',size:.72,
+    body:plant?'plant':appearance.animal.body,color:plant?appearance.plant.leaf:appearance.animal.primary,size:.72,
     speed:plant?0:36+(cell.mobility||0)*.28,jump:plant?0:5,swim:plant?0:58+(cell.mobility||0)*.35,
     defense:22+(cell.membrane||0)*.35,vision:20+(cell.sense||0)*.8,feed:plant?10:38+(cell.feeding||0)*.6,
     rootDepth:plant?48+(cell.storage||0)*.5:0,leafArea:plant?44+(cell.photosynthesis||0)*.6:0,
     toxin:cell.toxin||0,intelligence:8+Math.round((cell.complexity||0)*.12)
   });
-  Game.species.genes=genes;Game.species.type=plant?'Vegetal':'Aquático';Game.species.lifePath=path;Game.species.generation=1;
+  Game.species.genes=genes;Game.species.type=plant?'Vegetal':'Aquático';Game.species.lifePath=path;Game.species.generation=1;AppearanceSystem.syncGenes();
   Game.species.history.push('Multicelularidade alcançada. Caminho inicial: '+path+'.');
   WorldSystem.init();WeatherSystem.start();
   Game.player={id:'hero_1',x:D.WORLD_W/2,y:D.WORLD_H/2,hp:genes.hpMax,energy:genes.energyMax,water:genes.waterMax,age:0,alive:true,facing:1,foodCooldown:0,mateCooldown:0,attackCooldown:0};
   for(let tries=0;tries<800;tries++){const x=randi(6,D.WORLD_W-7),y=randi(6,D.WORLD_H-7);if(D.BIOME_ORDER[tile(x,y)]===Game.selectedBiome){Game.player.x=x+.5;Game.player.y=y+.5;break;}}
-  Game.lineage.push({id:'g1',name:Game.species.name,generation:1,biome:Game.selectedBiome,parents:['cell_origin'],genes:normGenes(genes),note:plant?'Primeiro organismo vegetal multicelular.':'Primeiro organismo animal aquático.'});
+  Game.lineage.push({id:'g1',name:Game.species.name,generation:1,biome:Game.selectedBiome,parents:['cell_origin'],genes:normGenes(genes),appearance:JSON.parse(JSON.stringify(Game.species.appearance)),note:plant?'Primeiro organismo vegetal multicelular.':'Primeiro organismo animal aquático.'});
   Game.discoveries=new Set([Game.selectedBiome]);setModal(UI.evo,false);
   say(plant?'A linhagem tornou-se um organismo vegetal multicelular.':'A linhagem tornou-se um organismo animal aquático.');UISystem.refresh();
 };
+
+
 
 WorldSystem.init=function(){
   Game.world={w:D.WORLD_W,h:D.WORLD_H,grid:new Uint8Array(D.WORLD_W*D.WORLD_H),moisture:new Float32Array(D.WORLD_W*D.WORLD_H),height:new Float32Array(D.WORLD_W*D.WORLD_H),fertility:new Float32Array(D.WORLD_W*D.WORLD_H)};
@@ -538,8 +700,10 @@ BiomeSystem.habitat=function(g,x,y){const b=this.at(x,y);const temp=b.temp+Weath
 BiomeSystem.discover=function(biomeId){if(Game.discoveries.has(biomeId))return;Game.discoveries.add(biomeId);Game.species.dna+=35;say('Novo bioma descoberto: '+D.BIOMES[biomeId].name+' • +35 DNA');};
 EvolutionSystem.newSpecies=function(name,biome){
   const genes=normGenes({body:'cell',color:'#70b9b8',size:.35,speed:16,jump:0,swim:18,vision:8,defense:8});
-  Game.species={name:name||'Carijó',type:'Célula primitiva',lifePath:'indefinida',genes,dna:18,biomass:0,stone:0,population:1,generation:0,knowledge:0,culture:0,technology:0,settlementLevel:0,relations:{},inventory:{madeira:0,pedra:0,agua:0,frutas:0,sementes:0,fibras:0,argila:0,minerio:0,carne:0,peixe:0},mutations:[],unlockedTech:[],season:1,foodMemory:0,explored:[],history:['A linhagem começou como uma célula simples. Bioma de destino: '+D.BIOMES[biome].name+'.']};
+  Game.species={name:name||'Carijó',type:'Célula primitiva',lifePath:'indefinida',genes,appearance:AppearanceSystem.defaults(),dna:18,biomass:0,stone:0,population:1,generation:0,knowledge:0,culture:0,technology:0,settlementLevel:0,relations:{},inventory:{madeira:0,pedra:0,agua:0,frutas:0,sementes:0,fibras:0,argila:0,minerio:0,carne:0,peixe:0},mutations:[],unlockedTech:[],season:1,foodMemory:0,explored:[],history:['A linhagem começou como uma célula simples. Bioma de destino: '+D.BIOMES[biome].name+'.']};
+  AppearanceSystem.syncGenes();
 };
+
 EvolutionSystem.mutateChild=function(mother,father){
   const keys=['speed','jump','climb','dig','swim','flight','vision','hearing','smell','perception','hunt','collect','feed','fertility','cold','heat','drought','defense','hpMax','energyMax','waterMax','intelligence','social','build'];
   const child=normGenes();
@@ -548,7 +712,7 @@ EvolutionSystem.mutateChild=function(mother,father){
   if(rand()<.08){const pool=D.MUTATIONS.filter(m=>!Game.species.mutations.includes(m.id));if(pool.length){const m=pick(pool);for(const [k,v] of Object.entries(m.effect))if(typeof v==='number')child[k]=(child[k]||0)+v;child._mutation=m.id;}}
   return child;
 };
-EvolutionSystem.buy=function(id){const m=D.MUTATIONS.find(x=>x.id===id);if(!m||Game.species.dna<m.cost||Game.species.mutations.includes(id))return false;Game.species.dna-=m.cost;Game.species.mutations.push(id);for(const[k,v]of Object.entries(m.effect)){Game.species.genes[k]=(Game.species.genes[k]||0)+v;}Game.species.history.push('Adaptação adquirida: '+m.name);say('Evolução adquirida: '+m.name);return true;};
+EvolutionSystem.buy=function(id){const m=D.MUTATIONS.find(x=>x.id===id);if(!m||Game.species.dna<m.cost||Game.species.mutations.includes(id))return false;Game.species.dna-=m.cost;Game.species.mutations.push(id);for(const[k,v]of Object.entries(m.effect)){Game.species.genes[k]=(Game.species.genes[k]||0)+v;}AppearanceSystem.applyMutation(id);AppearanceSystem.syncGenes();Game.species.history.push('Adaptação adquirida: '+m.name);say('Evolução adquirida: '+m.name);return true;};
 const PlayerSystem={};
 PlayerSystem.update=function(dt){
   const p=Game.player,g=Game.species.genes;if(!p||!p.alive)return;
@@ -637,7 +801,7 @@ RenderSystem.drawWorld=function(){
   for(const b of Game.buildings){if(Math.abs(b.x-p.x)<cols/2&&Math.abs(b.y-p.y)<rows/2){const s=this.worldToScreen(b.x+.5,b.y+.5);drawBuildingSprite(s.x,s.y,b.id);}}
   for(const plant of Game.plants){if(plant.growth<8)continue;if(Math.abs(plant.x-p.x)>cols/2||Math.abs(plant.y-p.y)>rows/2)continue;const s=this.worldToScreen(plant.x,plant.y);const spec=D.PLANTS[plant.species];SP.drawPlant(ctx,s.x,s.y,D.TILE*.7,spec,Game.time*.05);}
   for(const a of Game.animals){if(Math.abs(a.x-p.x)>cols/2||Math.abs(a.y-p.y)>rows/2)continue;const s=this.worldToScreen(a.x,a.y);SP.drawAnimal(ctx,s.x,s.y,D.TILE*.62,D.ANIMALS[a.species],{attack:a.state==='hunt'});}
-  const me=this.worldToScreen(p.x,p.y);if(Game.species.genes.body==='plant'){ctx.save();ctx.fillStyle='rgba(0,0,0,.24)';ctx.beginPath();ctx.ellipse(me.x,me.y+13,22,7,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#6d8b4d';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(me.x,me.y+12);ctx.lineTo(me.x,me.y-18);ctx.stroke();ctx.fillStyle='#78b966';for(const a of [-2.3,-1.15,-.1,1.05]){ctx.beginPath();ctx.ellipse(me.x+Math.cos(a)*13,me.y-8+Math.sin(a)*8,11,5,a,0,Math.PI*2);ctx.fill();}ctx.fillStyle='#d5b45d';ctx.beginPath();ctx.arc(me.x,me.y-22,7,0,Math.PI*2);ctx.fill();ctx.restore();}else SP.drawPlayer(ctx,me.x,me.y,D.TILE*.78,Game.species.genes,{facing:p.facing,shadow:true});
+  const me=this.worldToScreen(p.x,p.y);AppearanceSystem.drawCurrent(ctx,me.x,me.y,D.TILE*.78,{facing:p.facing,shadow:true});
   drawWeatherParticles();drawNightTint();drawFloating();
 };
 function drawBuildingSprite(x,y,id){ctx.save();ctx.imageSmoothingEnabled=false;const s=D.TILE*.9;const d={shelter:'#8b6948',campfire:'#d88a42',storage:'#9b744b',farm:'#6a9854',fence:'#876b4c',bridge:'#846747',workshop:'#79684e',tower:'#817258',house:'#8e7756',dock:'#657d89'}[id]||'#816';ctx.fillStyle=shadeColor(d,-22);ctx.fillRect(x-s*.35,y-s*.30,s*.7,s*.55);ctx.fillStyle=d;ctx.fillRect(x-s*.3,y-s*.22,s*.6,s*.42);if(id==='campfire')SP.pixelIcon(ctx,x,y-s*.05,15,'#f3b44f','fire');if(id==='farm'){ctx.fillStyle='#99b95d';for(let i=-2;i<=2;i++)ctx.fillRect(x+i*6,y+s*.12,3,7);}ctx.restore();}
@@ -661,14 +825,18 @@ UISystem.refresh=function(){if(!Game.species||!Game.player)return;
     RenderSystem.drawPortraits();return;
   }
   const g=Game.species.genes,p=Game.player,b=BiomeSystem.at(p.x,p.y);UI.stageLabel.textContent=g.body==='plant'?'ORGANISMO VEGETAL':'ORGANISMO COMPLEXO';UI.species.textContent=Game.species.name;UI.type.textContent=(g.body==='plant'?'VEGETAL':g.body==='fish'?'AQUÁTICO':g.body==='bird'?'VOADOR':'TERRESTRE');UI.generation.textContent='Geração '+Game.species.generation;UI.dna.textContent=Math.floor(Game.species.dna);UI.biomass.textContent=Math.floor(Game.species.biomass);UI.stone.textContent=Game.species.inventory.pedra||0;UI.population.textContent=Game.species.population;UI.hp.textContent=Math.round(p.hp);UI.energy.textContent=Math.round(p.energy);UI.water.textContent=Math.round(p.water);UI.barHp.style.width=clamp(p.hp/g.hpMax*100,0,100)+'%';UI.barEnergy.style.width=clamp(p.energy/g.energyMax*100,0,100)+'%';UI.barWater.style.width=clamp(p.water/g.waterMax*100,0,100)+'%';UI.speed.textContent=Math.round(g.speed);UI.defense.textContent=Math.round(g.defense);UI.jump.textContent=Math.round(g.jump);UI.vision.textContent=Math.round(g.vision);const habitat=Math.round(BiomeSystem.habitat(g,p.x,p.y));UI.polish.innerHTML=`<div class="ph-chip">BIOMA <b>${b.icon} ${b.name}</b></div><div class="ph-chip">CLIMA <b>${D.WEATHER[Game.weather].name}</b></div><div class="ph-chip">DIA <b>${Game.day}</b></div><div class="ph-chip">HABITAT <b>${habitat}%</b></div>`;UI.dashboardSubtitle.textContent=`${Game.species.name} • ${b.name}`;if(UI.controlsHint)UI.controlsHint.textContent=g.body==='plant'?'E absorver • R dispersar sementes • Q evoluir • M mapa • L linhagem':'WASD / setas para mover • E comer • R reproduzir • Q evoluir • B construir • M mapa • L linhagem';RenderSystem.drawPortraits();};
-RenderSystem.drawPortraits=function(){if(!Game.species)return;pctx.clearRect(0,0,pcanvas.width,pcanvas.height);evoCtx.clearRect(0,0,evoCanvas.width,evoCanvas.height);pctx.fillStyle='#0a160e';pctx.fillRect(0,0,pcanvas.width,pcanvas.height);evoCtx.fillStyle='#0a160e';evoCtx.fillRect(0,0,evoCanvas.width,evoCanvas.height);if(Game.stage==='cell'){CellSystem.drawPortrait(pctx,80,72,56);CellSystem.drawPortrait(evoCtx,130,110,92);UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const cell=Game.cell;const box=$('gene-summary');box.innerHTML=[['mobilidade',cell.mobility],['membrana',cell.membrane],['alimentação',cell.feeding],['fotossíntese',cell.photosynthesis],['sentidos',cell.sense],['complexidade',cell.complexity]].map(([k,v])=>`<div class="gene-pill">${k}<b>${Math.round(v||0)}</b></div>`).join('');return;}SP.drawPlayer(pctx,80,72,56,Game.species.genes,{facing:1});SP.drawPlayer(evoCtx,130,110,92,Game.species.genes,{facing:1});UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const box=$('gene-summary');box.innerHTML=['speed','defense','vision','heat','cold','drought','fertility','intelligence'].map(k=>`<div class="gene-pill">${k}<b>${Math.round(Game.species.genes[k]||0)}</b></div>`).join('');};
+RenderSystem.drawPortraits=function(){if(!Game.species)return;pctx.clearRect(0,0,pcanvas.width,pcanvas.height);evoCtx.clearRect(0,0,evoCanvas.width,evoCanvas.height);pctx.fillStyle='#0a160e';pctx.fillRect(0,0,pcanvas.width,pcanvas.height);evoCtx.fillStyle='#0a160e';evoCtx.fillRect(0,0,evoCanvas.width,evoCanvas.height);if(Game.stage==='cell'){CellSystem.drawPortrait(pctx,80,72,56);CellSystem.drawPortrait(evoCtx,130,110,92);UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const cell=Game.cell;const box=$('gene-summary');box.innerHTML=[['mobilidade',cell.mobility],['membrana',cell.membrane],['alimentação',cell.feeding],['fotossíntese',cell.photosynthesis],['sentidos',cell.sense],['complexidade',cell.complexity]].map(([k,v])=>`<div class="gene-pill">${k}<b>${Math.round(v||0)}</b></div>`).join('');return;}AppearanceSystem.syncGenes();AppearanceSystem.drawCurrent(pctx,80,72,56,{facing:1,shadow:false});AppearanceSystem.drawCurrent(evoCtx,130,110,92,{facing:1,shadow:false});UI.dnaLarge.textContent='DNA: '+Math.floor(Game.species.dna);const box=$('gene-summary');box.innerHTML=['speed','defense','vision','heat','cold','drought','fertility','intelligence'].map(k=>`<div class="gene-pill">${k}<b>${Math.round(Game.species.genes[k]||0)}</b></div>`).join('');};
 UISystem.renderEvolution=function(){
+  Game.evoView=Game.evoView||'adaptations';UI.evoOptions.innerHTML='';
+  const switcher=document.createElement('div');switcher.className='evo-switch';switcher.innerHTML=`<button class="${Game.evoView==='adaptations'?'active':''}" data-evo-view="adaptations">🧬 ADAPTAÇÕES</button><button class="${Game.evoView==='appearance'?'active':''}" data-evo-view="appearance">🎨 APARÊNCIA</button>`;UI.evoOptions.appendChild(switcher);
+  switcher.querySelectorAll('[data-evo-view]').forEach(b=>b.onclick=()=>{Game.evoView=b.dataset.evoView;UISystem.renderEvolution();});
   if(Game.stage==='cell'){
-    UI.evoTitle.textContent='EVOLUIR CÉLULA';UI.evoOptions.innerHTML='';
+    UI.evoTitle.textContent='EDITOR EVOLUTIVO • CÉLULA';
     const ownedCount=Game.species.mutations.filter(id=>CellSystem.mutations.some(m=>m.id===id)).length;
-    const intro=document.createElement('div');intro.className='cell-evo-path';
-    intro.innerHTML=`<div class='evo-status-main'><div><span class='evo-kicker'>CAMINHO ATUAL</span><strong>${CellSystem.path()}</strong></div><div class='evo-dna-pill'>🧬 ${Math.floor(Game.species.dna)} DNA</div></div><div class='evo-progress-row'><span>${Math.min(ownedCount,5)} / 5 adaptações para avançar</span><i><em style='width:${clamp(ownedCount/5*100,0,100)}%'></em></i></div><div class='cell-particle-legend'><span>🟠 comida</span><span>🩷 proteína</span><span>🟢 luz</span><span>🔵 DNA</span><span>🔴 maior = perigo</span></div>`;
-    UI.evoOptions.appendChild(intro);
+    const intro=document.createElement('div');intro.className='cell-evo-path evo-full';
+    intro.innerHTML=`<div class='evo-status-main'><div><span class='evo-kicker'>CAMINHO ATUAL</span><strong>${CellSystem.path()}</strong></div><div class='evo-dna-pill'>🧬 ${Math.floor(Game.species.dna)} DNA</div></div><div class='evo-progress-row'><span>${Math.min(ownedCount,5)} / 5 adaptações para avançar</span><i><em style='width:${clamp(ownedCount/5*100,0,100)}%'></em></i></div><p class="evo-editor-note">Mutações mudam o que a célula consegue fazer. Aparência muda o corpo que sua linhagem carrega adiante.</p>`;
+    UI.evoOptions.insertBefore(intro,switcher);
+    if(Game.evoView==='appearance'){const host=document.createElement('div');host.className='evo-full';UI.evoOptions.appendChild(host);AppearanceSystem.renderEditor('cell',host);RenderSystem.drawPortraits();return;}
     for(const m of CellSystem.mutations){
       const owned=Game.species.mutations.includes(m.id),check=CellSystem.canBuy(m),el=document.createElement('article');
       el.className='evo-option cell-mutation'+(owned?' owned':'')+(!owned&&!check.ok?' locked':'');el.dataset.branch=m.branch;
@@ -678,7 +846,12 @@ UISystem.renderEvolution=function(){
     }
     RenderSystem.drawPortraits();return;
   }
-  UI.evoTitle.textContent='LABORATÓRIO EVOLUTIVO';const g=Game.species.genes;UI.evoOptions.innerHTML='';for(const m of D.MUTATIONS){const owned=Game.species.mutations.includes(m.id);const el=document.createElement('article');el.className='evo-option';const effect=Object.entries(m.effect).filter(([,v])=>typeof v==='number').map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(' • ');el.innerHTML=`<h3>${m.name}</h3><p>${m.desc}</p><p>${effect}</p><footer><span class='cost'>🧬 ${m.cost} DNA</span><button class='small-btn' ${owned?'disabled':''}>${owned?'ADQUIRIDA':'ADAPTAR'}</button></footer>`;el.querySelector('button').onclick=()=>{if(EvolutionSystem.buy(m.id)){UISystem.renderEvolution();UISystem.refresh();}};UI.evoOptions.appendChild(el);}
+  UI.evoTitle.textContent='EDITOR EVOLUTIVO';const g=Game.species.genes,isPlant=g.body==='plant'||Game.species.lifePath==='vegetal';
+  const intro=document.createElement('div');intro.className='cell-evo-path evo-full';intro.innerHTML=`<div class='evo-status-main'><div><span class='evo-kicker'>LINHAGEM</span><strong>${isPlant?'vegetal':g.body==='bird'?'voadora':g.body==='quadruped'?'terrestre':'aquática'}</strong></div><div class='evo-dna-pill'>🧬 ${Math.floor(Game.species.dna)} DNA</div></div><p class="evo-editor-note">Você pode redesenhar a espécie, mas novos planos corporais e estruturas só aparecem quando a evolução libera.</p>`;UI.evoOptions.insertBefore(intro,switcher);
+  if(Game.evoView==='appearance'){const host=document.createElement('div');host.className='evo-full';UI.evoOptions.appendChild(host);AppearanceSystem.renderEditor(isPlant?'plant':'animal',host);RenderSystem.drawPortraits();return;}
+  const pool=D.MUTATIONS.filter(m=>isPlant?(m.group==='planta'||m.group==='defesa'||m.group==='adaptação'):m.group!=='planta');
+  for(const m of pool){const owned=Game.species.mutations.includes(m.id);const el=document.createElement('article');el.className='evo-option';const effect=Object.entries(m.effect).filter(([,v])=>typeof v==='number').map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(' • ');el.innerHTML=`<h3>${m.name}</h3><p>${m.desc}</p><p>${effect}</p><footer><span class='cost'>🧬 ${m.cost} DNA</span><button class='small-btn' ${owned?'disabled':''}>${owned?'ADQUIRIDA':'ADAPTAR'}</button></footer>`;el.querySelector('button').onclick=()=>{if(EvolutionSystem.buy(m.id)){UISystem.renderEvolution();UISystem.refresh();}};UI.evoOptions.appendChild(el);}
+  RenderSystem.drawPortraits();
 };
 UISystem.renderBuild=function(){UI.buildOptions.innerHTML='';for(const b of Object.values(D.BUILDINGS)){const el=document.createElement('article');el.className='build-option';el.innerHTML=`<h3>${b.name}</h3><p>${b.desc}</p><p>🌲 ${b.wood} • 🪨 ${b.stone} • tecnologia ${b.tech}</p><footer><span class="cost">Construção</span><button class="small-btn">ERGUR</button></footer>`;el.querySelector('button').onclick=()=>BuildingSystem.build(b.id);UI.buildOptions.appendChild(el);}}
 function renderBuild(){UISystem.renderBuild();}
@@ -688,7 +861,7 @@ UISystem.map=function(){const w=mapCanvas.width,h=mapCanvas.height;mapCtx.fillSt
 UISystem.lineage=function(){lineageCtx.fillStyle='#07110b';lineageCtx.fillRect(0,0,lineageCanvas.width,lineageCanvas.height);const nodes=Game.lineage.slice(-22);nodes.forEach((n,i)=>{const x=40+(i%7)*125,y=55+Math.floor(i/7)*130;lineageCtx.fillStyle='#14271a';lineageCtx.fillRect(x,y,104,58);lineageCtx.strokeStyle='#3a6540';lineageCtx.strokeRect(x,y,104,58);lineageCtx.fillStyle='#e8f1e3';lineageCtx.font='900 11px monospace';lineageCtx.fillText('G'+n.generation,x+10,y+18);lineageCtx.fillStyle='#8fa58f';lineageCtx.font='9px monospace';lineageCtx.fillText(String(n.name).slice(0,15),x+10,y+35);if(i>0){lineageCtx.strokeStyle='#547657';lineageCtx.beginPath();lineageCtx.moveTo(x-22,y+28);lineageCtx.lineTo(x,y+28);lineageCtx.stroke();}});UI.lineageTree.innerHTML=nodes.slice().reverse().map(n=>`<div class="lineage-node"><b>G${n.generation}</b><span>${n.name}</span><small>${n.note||'Descendente registrado'}</small></div>`).join('');setModal(UI.lineage,true);};
 SaveSystem.serialize=function(){const cellSave=Game.stage==='cell'&&Game.cell?Object.assign({},Game.cell,{explored:[...(Game.cell.explored||[])]}):null;const safe={version:D.VERSION,stage:Game.stage,seed:Game.seed,selectedBiome:Game.selectedBiome,species:Game.species,cell:cellSave,player:{x:Game.player.x,y:Game.player.y,hp:Game.player.hp,energy:Game.player.energy,water:Game.player.water,alive:Game.player.alive},weather:Game.weather,weatherTimer:Game.weatherTimer,day:Game.day,hour:Game.hour,discoveries:[...Game.discoveries],buildings:Game.buildings.slice(0,160),lineage:Game.lineage.slice(-120)};return JSON.stringify(safe);};
 SaveSystem.save=function(){try{localStorage.setItem('bioevo_save_final',this.serialize());say('Jogo salvo localmente.');}catch(e){say('Não foi possível salvar: '+e.message);}};
-SaveSystem.load=function(){try{const raw=localStorage.getItem('bioevo_save_final');if(!raw)return false;const s=JSON.parse(raw);if(!s||!s.species||!s.player)return false;Game.stage=s.stage||'organism';Game.seed=s.seed||Game.seed;Game.selectedBiome=s.selectedBiome||'cerrado';Game.species=s.species;Game.player=Object.assign(Game.player||{},s.player,{alive:s.player.alive!==false});Game.cell=s.cell||null;if(Game.cell){Game.cell.explored=new Set(Array.isArray(Game.cell.explored)?Game.cell.explored:[]);Game.cell.camera=Game.cell.camera||{x:Game.cell.x,y:Game.cell.y};Game.cell.microbes=(Game.cell.microbes||[]).map(m=>Object.assign({form:'blob',rotation:0,tailPhase:0,squash:0,lobes:4,spikes:7,segments:4,pulse:0,turn:0,cooldown:0,state:'wander'},m));Game.cell.particles=(Game.cell.particles||[]).map(p=>Object.assign({shape:p?.type==='mineral'?'crystal':p?.type==='protein'?'chain':p?.type==='dna'?'dna':'orb',phase:0},p));Game.cell.effects=[];Game.cell.densityTimer=0;}Game.weather=s.weather||'clear';Game.weatherTimer=s.weatherTimer||50;Game.day=s.day||1;Game.hour=s.hour||6;Game.discoveries=new Set(s.discoveries||[]);Game.buildings=s.buildings||[];Game.lineage=s.lineage||[];if(Game.stage==='cell'&&Game.cell){document.body.classList.add('cell-stage');}return true;}catch(e){console.warn(e);return false;}};
+SaveSystem.load=function(){try{const raw=localStorage.getItem('bioevo_save_final');if(!raw)return false;const s=JSON.parse(raw);if(!s||!s.species||!s.player)return false;Game.stage=s.stage||'organism';Game.seed=s.seed||Game.seed;Game.selectedBiome=s.selectedBiome||'cerrado';Game.species=s.species;AppearanceSystem.ensure();AppearanceSystem.syncGenes();Game.player=Object.assign(Game.player||{},s.player,{alive:s.player.alive!==false});Game.cell=s.cell||null;if(Game.cell){Game.cell.explored=new Set(Array.isArray(Game.cell.explored)?Game.cell.explored:[]);Game.cell.camera=Game.cell.camera||{x:Game.cell.x,y:Game.cell.y};Game.cell.microbes=(Game.cell.microbes||[]).map(m=>Object.assign({form:'blob',rotation:0,tailPhase:0,squash:0,lobes:4,spikes:7,segments:4,pulse:0,turn:0,cooldown:0,state:'wander'},m));Game.cell.particles=(Game.cell.particles||[]).map(p=>Object.assign({shape:p?.type==='mineral'?'crystal':p?.type==='protein'?'chain':p?.type==='dna'?'dna':'orb',phase:0},p));Game.cell.effects=[];Game.cell.densityTimer=0;}Game.weather=s.weather||'clear';Game.weatherTimer=s.weatherTimer||50;Game.day=s.day||1;Game.hour=s.hour||6;Game.discoveries=new Set(s.discoveries||[]);Game.buildings=s.buildings||[];Game.lineage=s.lineage||[];if(Game.stage==='cell'&&Game.cell){document.body.classList.add('cell-stage');}return true;}catch(e){console.warn(e);return false;}};
 UISystem.bind=function(){
   window.addEventListener('resize',RenderSystem.resize);RenderSystem.resize();
   window.addEventListener('keydown',e=>{Game.keys[e.key]=true;const k=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(k==='q'){UISystem.renderEvolution();setModal(UI.evo,true);}if(k==='e'){if(Game.stage==='cell')CellSystem.absorb();else PlayerSystem.eat();}if(Game.stage!=='cell'&&k==='b'){UISystem.renderBuild();setModal(UI.build,true);}if(Game.stage!=='cell'&&k==='l')UISystem.lineage();if(Game.stage!=='cell'&&k==='m')UISystem.map();if(Game.stage!=='cell'&&k==='r')ReproductionSystem.tryBreed();if(Game.stage!=='cell'&&k==='f')PlayerSystem.attack();if(k==='escape'){[UI.evo,UI.build,UI.lineage,UI.map].forEach(x=>setModal(x,false));UI.dashboard.classList.add('hidden');}if(k===' '){Game.paused=!Game.paused;say(Game.paused?'Simulação pausada.':'Simulação retomada.');}});window.addEventListener('keyup',e=>{Game.keys[e.key]=false;});
